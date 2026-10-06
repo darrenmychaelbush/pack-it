@@ -106,7 +106,3 @@ export function usableCells(level: LevelDefinition) {
 export function calculateWeight(level: LevelDefinition, items: GameItems, weights: Record<string, number>) {
   return level.items.reduce((sum, i) => sum + (items[i.instanceId].placement ? weights[i.itemId] ?? 0 : 0), 0);
 }
-
-export function packingEfficiency(moves: number, par: number) {
-  return Math.min(100, Math.round((par / Math.max(moves, 1)) * 100));
-}

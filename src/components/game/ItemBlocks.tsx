@@ -14,16 +14,28 @@ export function ItemBlocks({ shape, cell, item, selected, className }: Props) {
   const filled: { i: number; j: number }[] = [];
   shape.forEach((row, i) => row.forEach((v, j) => v && filled.push({ i, j })));
   const has = (i: number, j: number) => !!shape[i]?.[j];
-  // Emoji sits on the filled cell closest to the centroid.
+  // Emoji fills the largest solid square inside the footprint so art and piece read as one object.
+  let sq = { i: filled[0].i, j: filled[0].j, k: 1 };
+  for (const f of filled)
+    for (let k = sq.k + 1; k <= Math.min(shape.length, shape[0].length); k++) {
+      let ok = true;
+      for (let a = 0; a < k && ok; a++) for (let b = 0; b < k; b++) if (!has(f.i + a, f.j + b)) { ok = false; break; }
+      if (!ok) break;
+      sq = { i: f.i, j: f.j, k };
+    }
+  // Prefer a square nearest the centroid among equal sizes.
   const ci = filled.reduce((a, f) => a + f.i, 0) / filled.length;
   const cj = filled.reduce((a, f) => a + f.j, 0) / filled.length;
-  const anchor = filled.reduce((best, f) =>
-    Math.hypot(f.i - ci, f.j - cj) < Math.hypot(best.i - ci, best.j - cj) ? f : best,
-  );
-  const minDim = Math.min(shape.length, shape[0].length);
-  const emojiSize = Math.max(cell * 0.7, Math.min(minDim * cell * 0.62, cell * 1.9));
-  const emojiTop = (has(Math.round(ci), Math.round(cj)) ? ci : anchor.i) * cell + cell / 2;
-  const emojiLeft = (has(Math.round(ci), Math.round(cj)) ? cj : anchor.j) * cell + cell / 2;
+  for (const f of filled) {
+    let ok = true;
+    for (let a = 0; a < sq.k && ok; a++) for (let b = 0; b < sq.k; b++) if (!has(f.i + a, f.j + b)) { ok = false; break; }
+    const d = (x: { i: number; j: number }) => Math.hypot(x.i + (sq.k - 1) / 2 - ci, x.j + (sq.k - 1) / 2 - cj);
+    if (ok && d(f) < d(sq)) sq = { ...sq, i: f.i, j: f.j };
+  }
+  const elongated = sq.k === 1 && filled.length >= 3;
+  const emojiSize = sq.k * cell * (elongated ? 1.05 : 0.9);
+  const emojiTop = (sq.i + sq.k / 2) * cell;
+  const emojiLeft = (sq.j + sq.k / 2) * cell;
 
   return (
     <div
@@ -51,6 +63,10 @@ export function ItemBlocks({ shape, cell, item, selected, className }: Props) {
             borderTopRightRadius: !has(i - 1, j) && !has(i, j + 1) ? r : 0,
             borderBottomLeftRadius: !has(i + 1, j) && !has(i, j - 1) ? r : 0,
             borderBottomRightRadius: !has(i + 1, j) && !has(i, j + 1) ? r : 0,
+            boxShadow: [
+              !has(i - 1, j) && "inset 0 2px 0 color-mix(in oklab, white 35%, transparent)",
+              !has(i + 1, j) && "inset 0 -3px 0 color-mix(in oklab, black 22%, transparent)",
+            ].filter(Boolean).join(", ") || undefined,
           }}
         />
       ))}
