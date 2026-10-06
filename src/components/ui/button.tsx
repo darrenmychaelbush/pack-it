@@ -16,11 +16,17 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        success:
+          "bg-success text-success-foreground font-display text-lg font-semibold rounded-2xl shadow-[0_4px_0_0_color-mix(in_oklab,var(--success)_60%,black)] active:translate-y-[3px] active:shadow-none hover:brightness-105",
+        sky: "bg-primary text-primary-foreground font-display font-semibold rounded-2xl shadow-[0_4px_0_0_color-mix(in_oklab,var(--primary)_60%,black)] active:translate-y-[3px] active:shadow-none",
+        paper:
+          "bg-card text-foreground font-display font-semibold rounded-2xl border border-border shadow-[0_3px_0_0_var(--border)] active:translate-y-[2px] active:shadow-none",
       },
       size: {
         default: "h-9 px-4 py-2",
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-md px-8",
+        xl: "h-14 px-8 w-full",
         icon: "h-9 w-9",
       },
     },
