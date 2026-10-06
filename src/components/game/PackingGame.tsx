@@ -1,0 +1,586 @@
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowLeft, Lightbulb, RotateCcw, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ItemBlocks } from "./ItemBlocks";
+import { Stamp, Stars } from "./Stamp";
+import {
+  calculateStars,
+  canPlaceItem,
+  getHintPlacement,
+  getItemShape,
+  getOccupiedCells,
+  isLevelComplete,
+  loadLevel,
+  packingEfficiency,
+  placeItem,
+  removeItem,
+} from "@/game/engine";
+import { ITEMS } from "@/game/items";
+import { getNextLevel } from "@/game/levels";
+import { feedback } from "@/game/feedback";
+import { recordCompletion, useProgress } from "@/game/progress";
+import type { GameItems, LevelDefinition, Rotation, Shape } from "@/game/types";
+import { cn } from "@/lib/utils";
+
+type Phase = "briefing" | "playing" | "zipping" | "results";
+interface Ghost {
+  row: number;
+  col: number;
+  valid: boolean;
+}
+
+function useCellSize(level: LevelDefinition) {
+  const [cell, setCell] = useState(40);
+  useEffect(() => {
+    const f = () => {
+      const w = Math.min(window.innerWidth, 480) - 64;
+      const h = window.innerHeight - 380;
+      setCell(Math.max(26, Math.floor(Math.min(w / level.cols, h / level.rows, 58))));
+    };
+    f();
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, [level]);
+  return cell;
+}
+
+const NUDGES = [
+  [0, 0], [0, -1], [-1, 0], [-1, -1], [0, -2], [-2, 0], [1, 0], [0, 1],
+];
+
+export function PackingGame({ level }: { level: LevelDefinition }) {
+  const navigate = useNavigate();
+  const { progress } = useProgress();
+  const [phase, setPhase] = useState<Phase>("briefing");
+  const [items, setItems] = useState<GameItems>(() => loadLevel(level));
+  const [moves, setMoves] = useState(0);
+  const [hintUsed, setHintUsed] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [ghost, setGhost] = useState<Ghost | null>(null);
+  const [hint, setHint] = useState<ReturnType<typeof getHintPlacement>>(null);
+  const [shakeId, setShakeId] = useState<string | null>(null);
+  const [snap, setSnap] = useState<{ id: string; key: number } | null>(null);
+  const [result, setResult] = useState<{ stars: number; newStamp: boolean; moves: number } | null>(null);
+  const cell = useCellSize(level);
+  const trayCell = Math.min(20, Math.floor(cell * 0.5));
+
+  const boardRef = useRef<HTMLDivElement>(null);
+  const trayRef = useRef<HTMLDivElement>(null);
+  const floatRef = useRef<HTMLDivElement>(null);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const movesRef = useRef(moves);
+  movesRef.current = moves;
+  const hintRef = useRef(hintUsed);
+  hintRef.current = hintUsed;
+  const dragInfo = useRef<{ x: number; y: number; offX: number; offY: number; shape: Shape } | null>(null);
+
+  const packedCount = level.items.filter((i) => items[i.instanceId].placement).length;
+  const prevBest = progress.levels[level.id];
+
+  const finish = useCallback(
+    (finalMoves: number) => {
+      setSelected(null);
+      feedback("complete");
+      setTimeout(() => {
+        setPhase("zipping");
+        feedback("zip");
+      }, 450);
+      setTimeout(() => {
+        const stars = calculateStars(true, hintRef.current, finalMoves, level.parMoves);
+        const { newStamp } = recordCompletion(level, stars, finalMoves, hintRef.current);
+        setResult({ stars, newStamp, moves: finalMoves });
+        setPhase("results");
+        if (newStamp) setTimeout(() => feedback("stamp"), 1500);
+      }, 3000);
+    },
+    [level],
+  );
+
+  const commit = useCallback(
+    (next: GameItems, id: string) => {
+      setItems(next);
+      const m = movesRef.current + 1;
+      setMoves(m);
+      feedback("place");
+      setSnap({ id, key: Date.now() });
+      if (isLevelComplete(level, next)) finish(m);
+    },
+    [level, finish],
+  );
+
+  const shake = (id: string) => {
+    feedback("invalid");
+    setShakeId(id);
+    setTimeout(() => setShakeId(null), 480);
+  };
+
+  const positionFloat = () => {
+    const d = dragInfo.current;
+    if (floatRef.current && d) floatRef.current.style.transform = `translate3d(${d.x - d.offX}px, ${d.y - d.offY}px, 0)`;
+  };
+  useLayoutEffect(positionFloat, [dragId]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLElement>, id: string, source: "tray" | "board") => {
+    if (phase !== "playing" || e.button > 0) return;
+    e.preventDefault();
+    const st = itemsRef.current[id];
+    const shape = getItemShape(level, id, st.rotation);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const w = shape[0].length * cell;
+    const h = shape.length * cell;
+    const offX = source === "board" ? e.clientX - rect.left : w / 2;
+    const offY = source === "board" ? e.clientY - rect.top : h / 2 + Math.min(44, cell);
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let moved = false;
+    let g: Ghost | null = null;
+    dragInfo.current = { x: sx, y: sy, offX, offY, shape };
+
+    const move = (ev: PointerEvent) => {
+      const d = dragInfo.current!;
+      d.x = ev.clientX;
+      d.y = ev.clientY;
+      if (!moved) {
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return;
+        moved = true;
+        setDragId(id);
+        setSelected(id);
+        feedback("pickup");
+      }
+      positionFloat();
+      const b = boardRef.current!.getBoundingClientRect();
+      const left = ev.clientX - offX - b.left;
+      const top = ev.clientY - offY - b.top;
+      const cx = left + w / 2;
+      const cy = top + h / 2;
+      const near = cx > -cell && cx < b.width + cell && cy > -cell && cy < b.height + cell;
+      let next: Ghost | null = null;
+      if (near) {
+        const row = Math.round(top / cell);
+        const col = Math.round(left / cell);
+        next = { row, col, valid: canPlaceItem(level, itemsRef.current, id, shape, row, col) };
+      }
+      if (next?.row !== g?.row || next?.col !== g?.col || next?.valid !== g?.valid) {
+        g = next;
+        setGhost(next);
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      if (!moved) {
+        setSelected((s) => (s === id ? null : id));
+        dragInfo.current = null;
+        return;
+      }
+      setDragId(null);
+      setGhost(null);
+      dragInfo.current = null;
+      const cur = itemsRef.current[id];
+      if (g && g.valid) {
+        if (!cur.placement || cur.placement.row !== g.row || cur.placement.col !== g.col) {
+          commit(placeItem(itemsRef.current, id, { row: g.row, col: g.col }), id);
+        }
+        return;
+      }
+      const t = trayRef.current?.getBoundingClientRect();
+      if (source === "board" && t && ev.clientY >= t.top) {
+        setItems(removeItem(itemsRef.current, id));
+        return;
+      }
+      shake(id);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+
+  const rotateSelected = () => {
+    if (!selected || phase !== "playing") return;
+    const st = items[selected];
+    const nr = ((st.rotation + 1) % 4) as Rotation;
+    const shape = getItemShape(level, selected, nr);
+    if (!st.placement) {
+      setItems({ ...items, [selected]: { ...st, rotation: nr } });
+      feedback("rotate");
+      return;
+    }
+    for (const [dr, dc] of NUDGES) {
+      const row = st.placement.row + dr;
+      const col = st.placement.col + dc;
+      if (canPlaceItem(level, items, selected, shape, row, col)) {
+        commit(placeItem(items, selected, { row, col }, nr), selected);
+        return;
+      }
+    }
+    shake(selected);
+  };
+
+  const useHint = () => {
+    const h = getHintPlacement(level, items);
+    if (!h) return;
+    setHint(h);
+    setHintUsed(true);
+    setTimeout(() => setHint(null), 2200);
+  };
+
+  const restart = () => {
+    setItems(loadLevel(level));
+    setMoves(0);
+    setHintUsed(false);
+    setSelected(null);
+    setResult(null);
+    setPhase("playing");
+  };
+
+  const trayItems = level.items.filter((i) => !items[i.instanceId].placement);
+  const dragShape = dragId ? getItemShape(level, dragId, items[dragId].rotation) : null;
+  const dragDef = dragId ? ITEMS[level.items.find((i) => i.instanceId === dragId)!.itemId] : null;
+  const missing = level.missingInstanceId ? level.items.find((i) => i.instanceId === level.missingInstanceId) : undefined;
+  const coach =
+    phase === "playing" && moves === 0
+      ? level.levelNumber === 1
+        ? "Drag an item into the suitcase"
+        : level.levelNumber === 6
+          ? "Tap an item, then Rotate ↻"
+          : level.type === "forgot"
+            ? "Move packed items to make room"
+            : null
+      : level.levelNumber === 4 && phase === "playing" && moves >= 3 && moves <= 5
+        ? "Tip: packed items can be moved again"
+        : null;
+
+  return (
+    <div className="mx-auto flex h-dvh max-w-md select-none flex-col overflow-hidden" style={{ touchAction: "none" }}>
+      {/* Header */}
+      <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 pb-2 pt-3">
+        <Link to="/" aria-label="Back to map" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-card shadow-soft">
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <div className="min-w-0 text-center">
+          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Level {level.levelNumber} · {level.tripType}</div>
+          <h1 className="truncate text-xl font-semibold leading-tight">
+            {level.flag} {level.destination}, {level.country === "United Kingdom" ? "UK" : level.country}
+          </h1>
+        </div>
+        <div className="shrink-0 rounded-xl border border-border bg-card px-2.5 py-1 text-center shadow-soft">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Moves</div>
+          <div className={cn("font-display text-base font-semibold leading-none", moves > level.parMoves && "text-invalid")}>
+            {moves}<span className="text-xs text-muted-foreground">/{level.parMoves}</span>
+          </div>
+        </div>
+      </header>
+      <div className="flex items-center justify-center gap-2 px-4 pb-2 text-xs font-semibold text-muted-foreground">
+        <span className="rounded-full bg-card px-2.5 py-1 shadow-soft">🧳 {packedCount}/{level.items.length} packed</span>
+        <span className="rounded-full bg-card px-2.5 py-1 shadow-soft">☀️ {level.weather}</span>
+        <span className="rounded-full bg-card px-2.5 py-1 shadow-soft">Par {level.parMoves}</span>
+      </div>
+
+      {/* Board */}
+      <div className="wood-table relative mx-3 flex flex-1 items-center justify-center rounded-3xl">
+        {level.type === "forgot" && phase === "playing" && missing && !items[missing.instanceId].placement && (
+          <div className="float-in absolute left-3 right-3 top-2 z-10 rounded-xl bg-card/95 px-3 py-1.5 text-center text-xs font-bold shadow-soft">
+            <span className="text-invalid">Oops!</span> {level.missingMessage}
+          </div>
+        )}
+        <div className={cn("relative pt-5", phase === "zipping" && "settle")}>
+          <div className="suitcase-handle absolute left-1/2 top-0 h-6 w-20 -translate-x-1/2 rounded-t-xl" />
+          <div className="suitcase-shell relative rounded-[22px] p-2.5">
+            <div
+              ref={boardRef}
+              className="suitcase-lining relative overflow-visible rounded-xl"
+              style={{ width: level.cols * cell, height: level.rows * cell, backgroundSize: `${cell}px ${cell}px` }}
+            >
+              {level.blockedCells.map((b) => (
+                <div key={`${b.row}-${b.col}`} className="blocked-cell absolute rounded-md" style={{ top: b.row * cell + 2, left: b.col * cell + 2, width: cell - 4, height: cell - 4 }} />
+              ))}
+
+              {hint && (
+                <div className="hint-ghost pointer-events-none absolute z-20" style={{ top: hint.row * cell, left: hint.col * cell }}>
+                  {getOccupiedCells(hint.shape, 0, 0).map((c) => (
+                    <div key={`${c.row}-${c.col}`} className="absolute rounded-md border-2 border-dashed border-gold bg-gold/30" style={{ top: c.row * cell + 1, left: c.col * cell + 1, width: cell - 2, height: cell - 2 }} />
+                  ))}
+                  <span className="absolute -top-6 left-0 whitespace-nowrap rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-foreground">
+                    {ITEMS[level.items.find((i) => i.instanceId === hint.instanceId)!.itemId].name} goes here
+                  </span>
+                </div>
+              )}
+
+              {level.items.map((it) => {
+                const st = items[it.instanceId];
+                if (!st.placement) return null;
+                const shape = getItemShape(level, it.instanceId, st.rotation);
+                return (
+                  <div
+                    key={it.instanceId}
+                    onPointerDown={(e) => onPointerDown(e, it.instanceId, "board")}
+                    className={cn(
+                      "absolute z-10 cursor-grab touch-none transition-[top,left] duration-150",
+                      dragId === it.instanceId && "opacity-25",
+                      shakeId === it.instanceId && "shake",
+                    )}
+                    style={{ top: st.placement.row * cell, left: st.placement.col * cell, pointerEvents: "none" }}
+                  >
+                    <div
+                      key={snap?.id === it.instanceId ? snap.key : "s"}
+                      className={snap?.id === it.instanceId ? "snap-in" : undefined}
+                    >
+                      {/* Only filled cells catch the pointer so irregular gaps stay usable */}
+                      <div className="relative">
+                        <ItemBlocks shape={shape} cell={cell} item={ITEMS[it.itemId]} selected={selected === it.instanceId} />
+                        {getOccupiedCells(shape, 0, 0).map((c) => (
+                          <div key={`${c.row}-${c.col}`} className="absolute" style={{ top: c.row * cell, left: c.col * cell, width: cell, height: cell, pointerEvents: "auto" }} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {ghost && dragShape && (
+                <div className="pointer-events-none absolute z-30" style={{ top: ghost.row * cell, left: ghost.col * cell }}>
+                  {getOccupiedCells(dragShape, 0, 0).map((c) => {
+                    const r = ghost.row + c.row;
+                    const col = ghost.col + c.col;
+                    if (r < 0 || col < 0 || r >= level.rows || col >= level.cols) return null;
+                    return (
+                      <div
+                        key={`${c.row}-${c.col}`}
+                        className={cn("absolute rounded-md border-2", ghost.valid ? "border-valid bg-valid/30" : "border-invalid bg-invalid/30")}
+                        style={{ top: c.row * cell + 1, left: c.col * cell + 1, width: cell - 2, height: cell - 2 }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {(phase === "zipping" || phase === "results") && (
+              <div className="lid absolute inset-0 z-40 rounded-[22px]">
+                <svg className="zipper absolute inset-3 h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)]" preserveAspectRatio="none" viewBox="0 0 100 100">
+                  <path d="M50 2 H96 a2 2 0 0 1 2 2 V96 a2 2 0 0 1 -2 2 H4 a2 2 0 0 1 -2 -2 V4 a2 2 0 0 1 2 -2 H50" pathLength={1} fill="none" stroke="var(--gold)" strokeWidth="1.4" strokeDasharray="1" vectorEffect="non-scaling-stroke" style={{ strokeWidth: 3 }} />
+                </svg>
+                <div className="absolute inset-0 grid place-items-center">
+                  <div className="float-in rounded-lg border-2 border-leather bg-card px-3 py-1 font-display text-sm font-semibold" style={{ animationDelay: "1.9s" }}>
+                    {level.flag} {level.destination}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {coach && (
+          <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 animate-bounce whitespace-nowrap rounded-full bg-foreground px-3 py-1.5 text-xs font-bold text-background shadow-soft">
+            👇 {coach}
+          </div>
+        )}
+      </div>
+
+      {/* Tray + controls */}
+      <div ref={trayRef} className="px-3 pb-4 pt-3">
+        <div className="no-scrollbar flex min-h-[104px] gap-2 overflow-x-auto rounded-2xl border border-border bg-card p-2 shadow-soft">
+          {trayItems.length === 0 && (
+            <div className="grid w-full place-items-center text-sm font-semibold text-muted-foreground">
+              {phase === "playing" ? "Everything's in!" : "Zipping up…"}
+            </div>
+          )}
+          {trayItems.map((it) => {
+            const st = items[it.instanceId];
+            const shape = getItemShape(level, it.instanceId, st.rotation);
+            const def = ITEMS[it.itemId];
+            return (
+              <button
+                key={it.instanceId}
+                type="button"
+                onPointerDown={(e) => onPointerDown(e, it.instanceId, "tray")}
+                className={cn(
+                  "flex min-w-[84px] shrink-0 touch-none flex-col items-center justify-between gap-1 rounded-xl bg-muted px-2 py-2 transition",
+                  selected === it.instanceId && "ring-2 ring-gold",
+                  dragId === it.instanceId && "opacity-30",
+                  shakeId === it.instanceId && "shake",
+                  it.instanceId === level.missingInstanceId && "pulse-ring",
+                )}
+              >
+                <div className="grid flex-1 place-items-center">
+                  <ItemBlocks shape={shape} cell={trayCell} item={def} />
+                </div>
+                <span className="text-[11px] font-bold leading-none">{def.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Button variant="paper" className="h-12" onClick={restart} disabled={phase !== "playing"}>
+            <RotateCcw /> Reset
+          </Button>
+          <Button variant="sky" className="h-12" onClick={rotateSelected} disabled={!selected || phase !== "playing"}>
+            <RotateCw /> Rotate
+          </Button>
+          <Button variant="paper" className="h-12" onClick={useHint} disabled={phase !== "playing" || !!hint}>
+            <Lightbulb className="text-gold" /> Hint
+          </Button>
+        </div>
+      </div>
+
+      {/* Floating dragged item */}
+      {dragId && dragShape && dragDef && (
+        <div ref={floatRef} className="pointer-events-none fixed left-0 top-0 z-50" style={{ willChange: "transform" }}>
+          <div className="scale-105" style={{ filter: "drop-shadow(0 18px 14px oklch(0.2 0.05 262 / 0.35))" }}>
+            <ItemBlocks shape={dragShape} cell={cell} item={dragDef} />
+          </div>
+        </div>
+      )}
+
+      {phase === "briefing" && <Briefing level={level} best={prevBest?.stars ?? 0} onStart={() => setPhase("playing")} />}
+      {phase === "results" && result && (
+        <Results
+          level={level}
+          {...result}
+          onReplay={restart}
+          onNext={() => {
+            const next = getNextLevel(level);
+            if (next) navigate({ to: "/play/$levelId", params: { levelId: next.id } });
+            else navigate({ to: "/passport" });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function Postcard({ level }: { level: LevelDefinition }) {
+  return (
+    <div className="relative mx-auto w-full rotate-[-1.5deg] rounded-md bg-card p-2.5 shadow-lift">
+      <div className="relative grid h-36 place-items-center overflow-hidden rounded-sm bg-gradient-to-b from-accent to-primary/60">
+        <span className="text-7xl drop-shadow-lg">{level.landmark}</span>
+        <span className="absolute bottom-2 left-3 font-display text-2xl font-bold text-primary-foreground drop-shadow">Greetings from</span>
+      </div>
+      <Stamp level={level} size={78} className="absolute -right-3 -top-4 bg-card/80" />
+    </div>
+  );
+}
+
+function Briefing({ level, best, onStart }: { level: LevelDefinition; best: number; onStart: () => void }) {
+  const counts = new Map<string, number>();
+  level.items.forEach((i) => counts.set(i.itemId, (counts.get(i.itemId) ?? 0) + 1));
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-foreground/40 backdrop-blur-[2px]" style={{ touchAction: "auto" }}>
+      <div className="mx-auto flex min-h-full max-w-md items-end p-3 sm:items-center">
+        <div className="float-in w-full rounded-3xl bg-background p-5 shadow-lift">
+          <div className="mb-1 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            Level {level.levelNumber} · {level.tripType}
+          </div>
+          <Postcard level={level} />
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="truncate text-3xl font-semibold leading-none">{level.flag} {level.destination}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{level.country}</p>
+            </div>
+            {best > 0 && <Stars count={best} size={18} />}
+          </div>
+          <div className="mt-3 flex gap-2 text-sm font-semibold">
+            <span className="rounded-full bg-card px-3 py-1 shadow-soft">📅 {level.days} days</span>
+            <span className="rounded-full bg-card px-3 py-1 shadow-soft">☀️ {level.weather}</span>
+            <span className="rounded-full bg-card px-3 py-1 shadow-soft">🎯 Par {level.parMoves}</span>
+          </div>
+          {level.type === "forgot" ? (
+            <div className="mt-4 rounded-2xl border-2 border-invalid/40 bg-card p-3">
+              <div className="font-display text-lg font-semibold text-invalid">Oops! You forgot something.</div>
+              <p className="text-sm">{level.missingMessage}</p>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">{level.tagline}</p>
+          )}
+          <div className="mt-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Items to pack</div>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {[...counts.entries()].map(([id, n]) => (
+              <div key={id} className="flex flex-col items-center rounded-xl bg-card py-2 shadow-soft">
+                <span className="text-2xl">{ITEMS[id].emoji}</span>
+                <span className="mt-1 text-center text-[10px] font-bold leading-tight">{ITEMS[id].name}{n > 1 ? ` ×${n}` : ""}</span>
+              </div>
+            ))}
+          </div>
+          <Button variant="success" size="xl" className="mt-5" onClick={onStart}>
+            {level.type === "forgot" ? "Make It Fit!" : "Start Packing"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CONFETTI = ["✈️", "🌴", "⭐", "🧳", "🌍", "🎫"];
+
+function Results({
+  level, stars, newStamp, moves, onReplay, onNext,
+}: { level: LevelDefinition; stars: number; newStamp: boolean; moves: number; onReplay: () => void; onNext: () => void }) {
+  const next = getNextLevel(level);
+  const [pieces] = useState(() =>
+    Array.from({ length: 22 }, (_, i) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.8,
+      dur: 2.2 + Math.random() * 1.8,
+      e: CONFETTI[i % CONFETTI.length],
+    })),
+  );
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-foreground/55" style={{ touchAction: "auto" }}>
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        {pieces.map((p, i) => (
+          <span key={i} className="confetti absolute -top-6 text-xl" style={{ left: `${p.left}%`, animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s` }}>{p.e}</span>
+        ))}
+      </div>
+      <div className="mx-auto flex min-h-full max-w-md items-center p-4">
+        <div className="float-in w-full rounded-3xl bg-background p-6 text-center shadow-lift">
+          <h2 className="text-4xl font-bold text-primary">{stars === 3 ? "Perfect Pack!" : "Trip Complete!"}</h2>
+          <div className="mt-3 flex justify-center">
+            <Stars count={stars} size={44} animate />
+          </div>
+          <div className="relative mt-5 rounded-2xl border border-border bg-card p-4">
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Passport</div>
+            <div className="mt-2 flex items-center justify-center gap-4">
+              <div className={newStamp ? "stamp-press" : undefined} style={{ animationDelay: "1.4s" }}>
+                <Stamp level={level} size={104} />
+              </div>
+              <div className="text-left">
+                <div className="font-display text-xl font-semibold leading-tight">{level.destination}</div>
+                <div className="text-sm text-muted-foreground">{level.country}</div>
+                <div className="mt-1 text-xs font-bold uppercase text-stamp">
+                  {newStamp ? "+ Stamp earned" : "Stamp collected"}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl bg-card p-3 shadow-soft">
+              <div className="text-xs font-bold uppercase text-muted-foreground">Moves</div>
+              <div className="font-display text-2xl font-semibold">{moves} <span className="text-base text-muted-foreground">/ {level.parMoves}</span></div>
+            </div>
+            <div className="rounded-xl bg-card p-3 shadow-soft">
+              <div className="text-xs font-bold uppercase text-muted-foreground">Efficiency</div>
+              <div className="font-display text-2xl font-semibold">{packingEfficiency(moves, level.parMoves)}%</div>
+            </div>
+          </div>
+          {next && (
+            <p className="mt-4 text-sm font-semibold text-muted-foreground">
+              Next stop: <span className="text-foreground">{next.flag} {next.destination}</span> — 1 more trip to your next stamp
+            </p>
+          )}
+          <div className="mt-4 grid grid-cols-[auto_1fr] gap-2">
+            <Button variant="paper" className="h-14 px-5" onClick={onReplay}>
+              <RotateCcw /> Replay
+            </Button>
+            <Button variant="success" className="h-14" onClick={onNext}>
+              {next ? "Next Destination →" : "Open Passport"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
