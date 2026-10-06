@@ -75,6 +75,8 @@ function buildLevel(spec: LevelSpec): LevelDefinition {
   };
 }
 
+const START_FORGOT = [".DDDD.", ".DDDD.", ".BB..F", "EBBAAF", "EE.AA.", "E.CC..", "..CC.."];
+
 export const LEVELS: LevelDefinition[] = [
   buildLevel({
     id: "nashville", levelNumber: 1, type: "standard", destination: "Nashville", country: "USA", flag: "🇺🇸", landmark: "🎸",
