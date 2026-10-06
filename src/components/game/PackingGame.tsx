@@ -220,7 +220,7 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
     shake(selected);
   };
 
-  const useHint = () => {
+  const showHint = () => {
     const h = getHintPlacement(level, items);
     if (!h) return;
     setHint(h);
@@ -421,7 +421,7 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
           <Button variant="sky" className="h-12" onClick={rotateSelected} disabled={!selected || phase !== "playing"}>
             <RotateCw /> Rotate
           </Button>
-          <Button variant="paper" className="h-12" onClick={useHint} disabled={phase !== "playing" || !!hint}>
+          <Button variant="paper" className="h-12" onClick={showHint} disabled={phase !== "playing" || !!hint}>
             <Lightbulb className="text-gold" /> Hint
           </Button>
         </div>
