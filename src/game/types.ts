@@ -50,8 +50,8 @@ export interface LevelDefinition {
   blockedCells: Cell[];
   items: LevelItem[];
   startingPlacements: Record<string, StartingPlacement>;
-  missingInstanceId?: string;
-  missingMessage?: string;
+  missingInstanceId?: string | undefined;
+  missingMessage?: string | undefined;
   weightLimit: number | null;
   parMoves: number;
   passportStampId: string;
