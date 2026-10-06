@@ -54,6 +54,12 @@ export interface LevelDefinition {
   missingMessage?: string | undefined;
   weightLimit: number | null;
   parMoves: number;
+  /** Usable suitcase cells (grid minus blocked). */
+  usableCells: number;
+  /** Designer's intended final layout, derived from the authored grid. */
+  intendedSolution: { instanceId: string; row: number; col: number; rotation: Rotation }[];
+  /** Production gate: the solver must find between 1 and this many final arrangements. */
+  maxSolutions: number;
   passportStampId: string;
 }
 

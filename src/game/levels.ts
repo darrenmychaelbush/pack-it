@@ -29,7 +29,7 @@ function parseGrid(grid: string[]) {
   return { blobs: out, blocked, rows: grid.length, cols: grid[0].length };
 }
 
-interface LevelSpec extends Omit<LevelDefinition, "rows" | "cols" | "blockedCells" | "items" | "startingPlacements" | "missingInstanceId" | "parMoves" | "weightLimit" | "passportStampId"> {
+interface LevelSpec extends Omit<LevelDefinition, "rows" | "cols" | "blockedCells" | "items" | "startingPlacements" | "missingInstanceId" | "parMoves" | "weightLimit" | "passportStampId" | "usableCells" | "intendedSolution" | "maxSolutions"> {
   grid: string[];
   legend: Record<string, string>;
   scramble?: "none" | "some" | "all";
@@ -37,10 +37,11 @@ interface LevelSpec extends Omit<LevelDefinition, "rows" | "cols" | "blockedCell
   missing?: string;
   slack?: number;
   par?: number;
+  maxSolutions?: number;
 }
 
 function buildLevel(spec: LevelSpec): LevelDefinition {
-  const { grid, legend, scramble = "none", start, missing, slack = 2, par, ...meta } = spec;
+  const { grid, legend, scramble = "none", start, missing, slack = 2, par, maxSolutions = 1, ...meta } = spec;
   const parsed = parseGrid(grid);
   const items: LevelItem[] = Object.keys(parsed.blobs)
     .sort()
@@ -71,6 +72,9 @@ function buildLevel(spec: LevelSpec): LevelDefinition {
     missingInstanceId: missing ? `${legend[missing]}-${missing}` : undefined,
     weightLimit: null,
     parMoves: par ?? items.length + slack,
+    usableCells: parsed.rows * parsed.cols - parsed.blocked.length,
+    intendedSolution: items.map((i) => ({ instanceId: i.instanceId, row: i.solution.row, col: i.solution.col, rotation: 0 as Rotation })),
+    maxSolutions,
     passportStampId: `stamp-${meta.id}`,
   };
 }

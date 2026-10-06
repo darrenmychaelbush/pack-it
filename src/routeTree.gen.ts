@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PassportRouteImport } from './routes/passport'
+import { Route as DevLevelsRouteImport } from './routes/dev.levels'
 import { Route as PlayLevelIdRouteImport } from './routes/play.$levelId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const PassportRoute = PassportRouteImport.update({
   path: '/passport',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevLevelsRoute = DevLevelsRouteImport.update({
+  id: '/dev/levels',
+  path: '/dev/levels',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlayLevelIdRoute = PlayLevelIdRouteImport.update({
   id: '/play/$levelId',
   path: '/play/$levelId',
@@ -32,30 +38,34 @@ const PlayLevelIdRoute = PlayLevelIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/passport': typeof PassportRoute
+  '/dev/levels': typeof DevLevelsRoute
   '/play/$levelId': typeof PlayLevelIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/passport': typeof PassportRoute
+  '/dev/levels': typeof DevLevelsRoute
   '/play/$levelId': typeof PlayLevelIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/passport': typeof PassportRoute
+  '/dev/levels': typeof DevLevelsRoute
   '/play/$levelId': typeof PlayLevelIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/passport' | '/play/$levelId'
+  fullPaths: '/' | '/passport' | '/dev/levels' | '/play/$levelId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/passport' | '/play/$levelId'
-  id: '__root__' | '/' | '/passport' | '/play/$levelId'
+  to: '/' | '/passport' | '/dev/levels' | '/play/$levelId'
+  id: '__root__' | '/' | '/passport' | '/dev/levels' | '/play/$levelId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PassportRoute: typeof PassportRoute
+  DevLevelsRoute: typeof DevLevelsRoute
   PlayLevelIdRoute: typeof PlayLevelIdRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PassportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev/levels': {
+      id: '/dev/levels'
+      path: '/dev/levels'
+      fullPath: '/dev/levels'
+      preLoaderRoute: typeof DevLevelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/play/$levelId': {
       id: '/play/$levelId'
       path: '/play/$levelId'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PassportRoute: PassportRoute,
+  DevLevelsRoute: DevLevelsRoute,
   PlayLevelIdRoute: PlayLevelIdRoute,
 }
 export const routeTree = rootRouteImport

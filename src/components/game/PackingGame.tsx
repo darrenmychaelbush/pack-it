@@ -12,7 +12,6 @@ import {
   getOccupiedCells,
   isLevelComplete,
   loadLevel,
-  packingEfficiency,
   placeItem,
   removeItem,
 } from "@/game/engine";
@@ -441,6 +440,7 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
         <Results
           level={level}
           {...result}
+          hintUsed={hintUsed}
           onReplay={restart}
           onNext={() => {
             const next = getNextLevel(level);
@@ -517,8 +517,8 @@ function Briefing({ level, best, onStart }: { level: LevelDefinition; best: numb
 const CONFETTI = ["✈️", "🌴", "⭐", "🧳", "🌍", "🎫"];
 
 function Results({
-  level, stars, newStamp, moves, onReplay, onNext,
-}: { level: LevelDefinition; stars: number; newStamp: boolean; moves: number; onReplay: () => void; onNext: () => void }) {
+  level, stars, newStamp, moves, hintUsed, onReplay, onNext,
+}: { level: LevelDefinition; stars: number; newStamp: boolean; moves: number; hintUsed: boolean; onReplay: () => void; onNext: () => void }) {
   const next = getNextLevel(level);
   const [pieces] = useState(() =>
     Array.from({ length: 22 }, (_, i) => ({
@@ -559,11 +559,11 @@ function Results({
           <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-xl bg-card p-3 shadow-soft">
               <div className="text-xs font-bold uppercase text-muted-foreground">Moves</div>
-              <div className="font-display text-2xl font-semibold">{moves} <span className="text-base text-muted-foreground">/ {level.parMoves}</span></div>
+              <div className="font-display text-2xl font-semibold">{moves} <span className="text-base text-muted-foreground">/ par {level.parMoves}</span></div>
             </div>
             <div className="rounded-xl bg-card p-3 shadow-soft">
-              <div className="text-xs font-bold uppercase text-muted-foreground">Efficiency</div>
-              <div className="font-display text-2xl font-semibold">{packingEfficiency(moves, level.parMoves)}%</div>
+              <div className="text-xs font-bold uppercase text-muted-foreground">No hint</div>
+              <div className="font-display text-2xl font-semibold">{hintUsed ? "✗" : "✓"}</div>
             </div>
           </div>
           {next && (
