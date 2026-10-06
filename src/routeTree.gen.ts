@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PassportRouteImport } from './routes/passport'
+import { Route as PlayLevelIdRouteImport } from './routes/play.$levelId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PassportRoute = PassportRouteImport.update({
+  id: '/passport',
+  path: '/passport',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayLevelIdRoute = PlayLevelIdRouteImport.update({
+  id: '/play/$levelId',
+  path: '/play/$levelId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/passport': typeof PassportRoute
+  '/play/$levelId': typeof PlayLevelIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/passport': typeof PassportRoute
+  '/play/$levelId': typeof PlayLevelIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/passport': typeof PassportRoute
+  '/play/$levelId': typeof PlayLevelIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/passport' | '/play/$levelId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/passport' | '/play/$levelId'
+  id: '__root__' | '/' | '/passport' | '/play/$levelId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PassportRoute: typeof PassportRoute
+  PlayLevelIdRoute: typeof PlayLevelIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/passport': {
+      id: '/passport'
+      path: '/passport'
+      fullPath: '/passport'
+      preLoaderRoute: typeof PassportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/play/$levelId': {
+      id: '/play/$levelId'
+      path: '/play/$levelId'
+      fullPath: '/play/$levelId'
+      preLoaderRoute: typeof PlayLevelIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PassportRoute: PassportRoute,
+  PlayLevelIdRoute: PlayLevelIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
