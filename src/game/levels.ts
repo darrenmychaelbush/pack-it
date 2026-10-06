@@ -79,7 +79,7 @@ function buildLevel(spec: LevelSpec): LevelDefinition {
   };
 }
 
-const START_FORGOT: string[] | undefined = undefined;
+const START_FORGOT = [".CCCCE.", ".CFDDEE", "HHFFDDD", "GHHFDAD", "GGGGDAD", "...GAAA"];
 
 export const LEVELS: LevelDefinition[] = [
   buildLevel({
