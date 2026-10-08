@@ -13,6 +13,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "A cozy travel packing puzzle. Drag, rotate and fit everything in your suitcase, then collect passport stamps." },
       { property: "og:title", content: "Pack It! — Puzzle your way around the world" },
       { property: "og:description", content: "Drag, rotate and fit every item into the suitcase. Earn stars and passport stamps." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Home,

@@ -11,6 +11,8 @@ export const Route = createFileRoute("/passport")({
       { name: "description", content: "Every destination you've packed for, stamped in your travel passport." },
       { property: "og:title", content: "My Passport — Pack It!" },
       { property: "og:description", content: "Collect a passport stamp for every trip you pack." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: PassportPage,

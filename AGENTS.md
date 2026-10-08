@@ -20,3 +20,5 @@
 - `noUncheckedIndexedAccess` is off: the engine indexes dense grid/shape matrices whose bounds are checked explicitly.
 - Realistic packed footprints and item artwork live in `src/game/sizes.ts`; size-checked levels must use those footprints (tested) — keeps relative item sizes believable.
 - Unfinished puzzles are saved through `ProgressStore` puzzle methods, separate from completed progress, and cleared on completion — lets players exit and resume safely.
+- Forgot It! difficulty is measured by `src/game/rearrange.ts`, whose moves relocate packed items without removing them — keeps rearrangement constraints testable.
+- Destination advances use `LevelTransition` data and the lightweight `TravelTransition` overlay — keeps transport and map framing extensible without coupling it to results.
