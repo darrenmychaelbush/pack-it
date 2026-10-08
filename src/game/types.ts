@@ -54,6 +54,8 @@ export interface LevelDefinition {
   missingMessage?: string | undefined;
   weightLimit: number | null;
   parMoves: number;
+  /** For Forgot It!: verified minimum number of packed-item relocations before the missing item fits. */
+  minimumMeaningfulMoves: number;
   /** Usable suitcase cells (grid minus blocked). */
   usableCells: number;
   /** Designer's intended final layout, derived from the authored grid. */
