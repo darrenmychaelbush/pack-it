@@ -239,6 +239,7 @@
 .travel-pin-center { fill: var(--card); stroke: none; }
 .travel-destination-pin.is-arrived { animation: destination-pop 400ms both; }
 .travel-label { fill: var(--foreground); stroke: var(--atlas-land); stroke-width: 5px; paint-order: stroke; font-family: var(--font-sans); font-size: 21px; font-weight: 900; }
+@media (max-width: 600px) { .travel-label { font-size: 17px; } }
 .travel-plane { fill: var(--atlas-route); stroke: var(--card); stroke-width: 1; filter: drop-shadow(var(--atlas-shadow)); }
 .travel-plane-detail { fill: none; stroke: var(--card); stroke-width: 1; opacity: 0.7; }
 .travel-arrived-title { animation: atlas-title 300ms both; }

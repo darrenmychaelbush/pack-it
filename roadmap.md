@@ -1,4 +1,4 @@
 # Travel transition upgrade
-- [ ] Real coordinates, geographic outlines, and auto-fit routes
-- [ ] Heading-aligned airplane, markers, timing, skip, and reduced motion
-- [ ] Verify directions, progression, and unchanged packing gameplay
+- [x] Real coordinates, geographic outlines, and auto-fit routes
+- [x] Heading-aligned airplane, markers, timing, skip, and reduced motion
+- [x] Verify directions, progression, and unchanged packing gameplay

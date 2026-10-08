@@ -61,7 +61,7 @@ export function TravelTransition({ from, to, transition, onArrive }: Props) {
   const plane = geography.planeAt(flight);
   const arrived = reduced || elapsed >= 1500;
   const countryPaths = useMemo(() => atlas?.features.map((feature, index) => <path key={index} d={geography.countryPath(feature) ?? ""} />), [atlas, geography]);
-  const originRight = geography.origin[0] > geography.destination[0];
+  const labelX = (x: number) => Math.max(70, Math.min(dimensions.width - 70, x));
   return (
     <div className="travel-transition fixed inset-0 z-[100] flex flex-col overflow-hidden text-foreground" data-region={transition.mapRegion}>
       <div className="travel-atlas-heading relative z-10 px-5 pt-8 text-center">
@@ -76,11 +76,11 @@ export function TravelTransition({ from, to, transition, onArrive }: Props) {
           {ink > 0 && <path d={geography.path(ink)} className="travel-route" />}
           <g transform={`translate(${geography.origin.join(" ")})`}>
             <g className="travel-origin-stamp"><circle r="17" /><circle r="13" /><path d="M-7 0 L-2 5 L8 -6" /></g>
-            <text x={originRight ? 26 : -26} y="-24" textAnchor={originRight ? "start" : "end"} className="travel-label">{from.destination}</text>
+            <text x={labelX(geography.origin[0]) - geography.origin[0]} y="-38" textAnchor="middle" className="travel-label">{from.destination}</text>
           </g>
           <g transform={`translate(${geography.destination.join(" ")})`}>
             <g className={`travel-destination-pin ${arrived ? "is-arrived" : ""}`}><circle className="travel-pin-halo" r="27" /><path d="M0 11 C-4 5 -15 -4 -15 -13 A15 15 0 1 1 15 -13 C15 -4 4 5 0 11Z" /><circle className="travel-pin-center" cy="-13" r="5" /></g>
-            <text x={originRight ? -26 : 26} y="34" textAnchor={originRight ? "end" : "start"} className="travel-label">{to.destination}</text>
+            <text x={labelX(geography.destination[0]) - geography.destination[0]} y="38" textAnchor="middle" className="travel-label">{to.destination}</text>
           </g>
           {!reduced && elapsed >= 450 && transition.transportType === "plane" && <g transform={`translate(${plane.x} ${plane.y}) rotate(${plane.heading})`} className="travel-plane">
             <path d="M0 -28 C4 -27 5 -20 5 -12 L27 2 L27 8 L5 2 L4 17 L12 23 L12 27 L0 23 L-12 27 L-12 23 L-4 17 L-5 2 L-27 8 L-27 2 L-5 -12 C-5 -20 -4 -27 0 -28Z" />
