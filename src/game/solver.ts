@@ -26,6 +26,22 @@ export function uniqueOrientations(shape: Shape, allowed: Rotation[] = [0, 1, 2,
   return out;
 }
 
+/** Canonical footprint key (identical under rotation). */
+export function footprintKey(shape: Shape) {
+  return uniqueOrientations(shape).map((o) => o.shape.map((r) => r.join("")).join("/")).sort()[0];
+}
+
+/** For each piece, index of the previous piece with the same footprint (or -1). */
+export function footprintPredecessors(shapes: Shape[]) {
+  const last = new Map<string, number>();
+  return shapes.map((s, i) => {
+    const k = footprintKey(s);
+    const p = last.get(k) ?? -1;
+    last.set(k, i);
+    return p;
+  });
+}
+
 interface Option {
   piece: number;
   cells: number[];
@@ -35,7 +51,8 @@ interface Option {
 /**
  * Backtracking exact-cover-with-holes solver. Every piece must be placed; usable cells left
  * empty are "holes" (count is fixed by area). Branches on the empty cell with the fewest
- * legal options (MRV). Stops once `limit` solutions are found.
+ * legal options (MRV). Counts distinct footprint layouts (same-shaped pieces are interchangeable).
+ * Stops once `limit` solutions are found.
  */
 export function solveBoard(board: BoardSpec, limit: number): SolvedPlacement[][] {
   const { rows, cols, pieces } = board;
@@ -72,9 +89,13 @@ export function solveBoard(board: BoardSpec, limit: number): SolvedPlacement[][]
   });
 
   const used = new Uint8Array(pieces.length);
+  // Pieces with the same footprint are interchangeable: swapping them is the same layout.
+  // Symmetry breaking: within a footprint class, pieces are placed in index order.
+  const prev = footprintPredecessors(pieces.map((p) => p.shape));
   const chosen: number[] = [];
   const solutions: SolvedPlacement[][] = [];
-  const fits = (o: Option) => !used[o.piece] && o.cells.every((idx) => occ[idx] === 0);
+  const fits = (o: Option) =>
+    !used[o.piece] && (prev[o.piece] === -1 || used[prev[o.piece]] === 1) && o.cells.every((idx) => occ[idx] === 0);
 
   const recurse = () => {
     if (solutions.length >= limit) return;
