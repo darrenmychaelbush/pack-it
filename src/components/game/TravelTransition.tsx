@@ -1,4 +1,7 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FeatureCollection } from "geojson";
+import { Button } from "@/components/ui/button";
+import { createTravelGeography, REDUCED_TRAVEL_DURATION_MS, TRAVEL_DURATION_MS, warmTravelAtlas } from "@/game/geography";
 import type { LevelDefinition } from "@/game/types";
 import type { LevelTransition } from "@/game/transitions";
 
@@ -10,40 +13,76 @@ interface Props {
 }
 
 export function TravelTransition({ from, to, transition, onArrive }: Props) {
-  const pathId = useId().replace(/:/g, "");
-  const [leaving, setLeaving] = useState(false);
-  useEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timer = window.setTimeout(onArrive, reduce ? 750 : 1800);
-    return () => window.clearTimeout(timer);
-  }, [onArrive]);
+  const geography = useMemo(() => createTravelGeography(from.id, to.id), [from.id, to.id]);
+  const [atlas, setAtlas] = useState<FeatureCollection | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [reduced, setReduced] = useState(false);
+  const done = useRef(false);
+  const arriveRef = useRef(onArrive);
+  arriveRef.current = onArrive;
   const skip = () => {
-    if (leaving) return;
-    setLeaving(true);
-    onArrive();
+    if (done.current) return;
+    done.current = true;
+    arriveRef.current();
   };
+  useEffect(() => {
+    let active = true;
+    void warmTravelAtlas().then((data) => { if (active) setAtlas(data); }).catch(() => {});
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const reduce = preference.matches;
+    setReduced(reduce);
+    const duration = reduce ? REDUCED_TRAVEL_DURATION_MS : TRAVEL_DURATION_MS;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      if (done.current) return;
+      setElapsed(now - start);
+      if (now - start >= duration) {
+        done.current = true;
+        arriveRef.current();
+      } else frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => { active = false; cancelAnimationFrame(frame); };
+  }, []);
+  const flight = reduced ? 1 : Math.min(1, Math.max(0, (elapsed - 450) / 1050));
+  const ink = reduced ? 1 : Math.min(1, Math.max(0, (elapsed - 350) / 1050));
+  const plane = geography.planeAt(flight);
+  const arrived = reduced || elapsed >= 1500;
+  const countryPaths = useMemo(() => atlas?.features.map((feature, index) => <path key={index} d={geography.countryPath(feature) ?? ""} />), [atlas, geography]);
+  const originRight = geography.origin[0] > geography.destination[0];
   return (
-    <button type="button" onClick={skip} className={`travel-transition fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden bg-background text-foreground ${leaving ? "opacity-0" : ""}`} aria-label={`Travel from ${from.destination} to ${to.destination}. Tap to skip.`}>
-      <div className="absolute left-5 top-5 rounded-full border border-border bg-card px-3 py-1 text-xs font-bold uppercase text-muted-foreground">Tap to skip</div>
-      <div className="mb-5 text-center">
-        <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Next destination</div>
-        <h2 className="font-display text-3xl font-semibold">{to.flag} {to.destination}</h2>
-        <p className="text-sm font-bold uppercase text-primary">{to.tripType}</p>
+    <div className="travel-transition fixed inset-0 z-[100] flex flex-col overflow-hidden text-foreground" data-region={transition.mapRegion}>
+      <div className="travel-atlas-heading relative z-10 px-5 pt-8 text-center">
+        <p className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Next destination</p>
+        <h2 className={`mt-2 font-display text-4xl font-semibold ${arrived ? "travel-arrived-title" : ""}`}>{to.flag} {to.destination}</h2>
+        <p className="mt-1 text-sm font-extrabold uppercase text-primary">{to.tripType}</p>
       </div>
-      <svg viewBox="0 0 360 230" className="w-full max-w-md" role="img" aria-label={`Dotted flight path from ${from.destination} to ${to.destination}`}>
-        <defs><path id={pathId} d="M 48 172 Q 172 38 312 76" /></defs>
-        <path d="M14 34 C72 12 125 42 165 31 C214 17 263 26 346 12 L356 205 C271 218 207 193 157 210 C102 228 52 202 3 216 Z" className="travel-land" />
-        <use href={`#${pathId}`} className="travel-route" pathLength="1" />
-        <circle cx="48" cy="172" r="8" className="travel-pin travel-pin-done" />
-        <circle cx="312" cy="76" r="10" className="travel-pin travel-pin-next" />
-        <text x="30" y="199" className="travel-label">✓ {from.destination}</text>
-        <text x="274" y="56" className="travel-label travel-label-next">{to.destination}</text>
-        <g className="travel-plane">
-          <animateMotion dur="1.25s" begin=".22s" fill="freeze" rotate="auto"><mpath href={`#${pathId}`} /></animateMotion>
-          <path d="M-12,-4 L2,-4 L10,-12 L14,-11 L9,-4 L17,0 L9,4 L14,11 L10,12 L2,4 L-12,4 L-17,8 L-19,7 L-16,0 L-19,-7 L-17,-8 Z" />
-        </g>
-      </svg>
-      <div className="mt-3 rounded-full bg-card px-4 py-2 text-sm font-semibold shadow-soft">{transition.transportType === "plane" ? "✈" : ""} {from.destination} → {to.destination}</div>
-    </button>
+      <div className="relative flex min-h-0 flex-1 items-center justify-center">
+        <svg viewBox="0 0 600 640" className="travel-atlas" role="img" aria-label={`Geographic flight route from ${from.destination} to ${to.destination}`}>
+          <g className="travel-countries">{countryPaths}</g>
+          <path d={geography.path(1)} className="travel-route-guide" />
+          {ink > 0 && <path d={geography.path(ink)} className="travel-route" />}
+          <g transform={`translate(${geography.origin.join(" ")})`}>
+            <g className="travel-origin-stamp"><circle r="17" /><circle r="13" /><path d="M-7 0 L-2 5 L8 -6" /></g>
+            <text x={originRight ? 26 : -26} y="-24" textAnchor={originRight ? "start" : "end"} className="travel-label">{from.destination}</text>
+          </g>
+          <g transform={`translate(${geography.destination.join(" ")})`}>
+            <g className={`travel-destination-pin ${arrived ? "is-arrived" : ""}`}><circle className="travel-pin-halo" r="27" /><path d="M0 11 C-4 5 -15 -4 -15 -13 A15 15 0 1 1 15 -13 C15 -4 4 5 0 11Z" /><circle className="travel-pin-center" cy="-13" r="5" /></g>
+            <text x={originRight ? -26 : 26} y="34" textAnchor={originRight ? "end" : "start"} className="travel-label">{to.destination}</text>
+          </g>
+          {!reduced && elapsed >= 450 && transition.transportType === "plane" && <g transform={`translate(${plane.x} ${plane.y}) rotate(${plane.heading})`} className="travel-plane">
+            <path d="M0 -28 C4 -27 5 -20 5 -12 L27 2 L27 8 L5 2 L4 17 L12 23 L12 27 L0 23 L-12 27 L-12 23 L-4 17 L-5 2 L-27 8 L-27 2 L-5 -12 C-5 -20 -4 -27 0 -28Z" />
+            <path className="travel-plane-detail" d="M-2 -19 Q0 -22 2 -19 M0 -10 V16" />
+          </g>}
+        </svg>
+      </div>
+      <footer className="relative z-10 flex flex-col items-center gap-3 px-5 pb-6 text-center">
+        <p className="text-sm font-bold">{from.destination} <span className="px-2 text-primary">→</span> {to.destination}</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Natural Earth · Pack It! travel atlas</p>
+        <Button variant="ghost" onClick={skip} className="text-xs font-extrabold uppercase tracking-widest">Tap to skip</Button>
+      </footer>
+      <Button variant="ghost" onClick={skip} className="absolute inset-0 z-0 h-full w-full rounded-none p-0 hover:bg-transparent" aria-label={`Skip travel from ${from.destination} to ${to.destination}`} />
+    </div>
   );
 }

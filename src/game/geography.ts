@@ -52,8 +52,8 @@ export function createTravelGeography(fromId: string, toId: string) {
     return points.slice(0, count).map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
   };
   const planeAt = (fraction: number) => {
-    const index = Math.min(points.length - 2, Math.max(0, fraction) * (points.length - 1));
-    const whole = Math.floor(index);
+    const index = Math.min(points.length - 1, Math.max(0, fraction) * (points.length - 1));
+    const whole = Math.min(points.length - 2, Math.floor(index));
     const a = points[whole];
     const b = points[whole + 1];
     const t = index - whole;

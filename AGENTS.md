@@ -21,4 +21,4 @@
 - Realistic packed footprints and item artwork live in `src/game/sizes.ts`; size-checked levels must use those footprints (tested) — keeps relative item sizes believable.
 - Unfinished puzzles are saved through `ProgressStore` puzzle methods, separate from completed progress, and cleared on completion — lets players exit and resume safely.
 - Forgot It! difficulty is measured by `src/game/rearrange.ts`, whose moves relocate packed items without removing them — keeps rearrangement constraints testable.
-- Destination advances use `LevelTransition` data and the lightweight `TravelTransition` overlay — keeps transport and map framing extensible without coupling it to results.
+- Destination advances use `LevelTransition` and a keyless Natural Earth atlas; coordinates and great-circle projection live in browser-safe game modules, with geography warmed during gameplay — keeps camera, transport, and future world progression reusable without changing packing or depending on API keys.

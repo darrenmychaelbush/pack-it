@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Lightbulb, RotateCcw, RotateCw, X } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import { getNextLevel } from "@/game/levels";
 import { feedback } from "@/game/feedback";
 import { clearSavedPuzzle, loadSavedPuzzle, recordCompletion, restoreSavedPuzzle, savePuzzle, toSavedPuzzle, useProgress } from "@/game/progress";
 import { transitionFor } from "@/game/transitions";
+import { warmTravelAtlas } from "@/game/geography";
 import type { GameItems, LevelDefinition, Rotation, Shape } from "@/game/types";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,12 @@ const NUDGES = [
 
 export function PackingGame({ level }: { level: LevelDefinition }) {
   const navigate = useNavigate();
+  const router = useRouter();
+  useEffect(() => {
+    void warmTravelAtlas().catch(() => {});
+    const next = getNextLevel(level);
+    if (next) void router.preloadRoute({ to: "/play/$levelId", params: { levelId: next.id } }).catch(() => {});
+  }, [level, router]);
   const { progress } = useProgress();
   const [phase, setPhase] = useState<Phase>("briefing");
   const [items, setItems] = useState<GameItems>(() => loadLevel(level));
