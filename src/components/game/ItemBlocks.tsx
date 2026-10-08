@@ -35,6 +35,9 @@ function ItemArt({ shape, cell, item, selected, className, art, native, turns }:
         src={art}
         alt={item.name}
         draggable={false}
+        loading="lazy"
+        width={Math.max(1, Math.round(native[0].length * 512))}
+        height={Math.max(1, Math.round(native.length * 512))}
         style={{
           position: "absolute",
           left: W / 2 - nw / 2,

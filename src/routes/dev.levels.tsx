@@ -43,18 +43,20 @@ function LevelCard({ level }: { level: LevelDefinition }) {
   };
   return (
     <div className="rounded-2xl bg-card p-4 shadow-soft">
-      <h2 className="text-xl font-semibold">Level {level.levelNumber} — {level.destination}{level.type === "forgot" ? " (Forgot It!)" : ""}</h2>
+      <h2 className="text-xl font-semibold">Level {level.levelNumber} — {level.destination}</h2>
       <dl className="mt-2 grid grid-cols-2 gap-x-4 text-sm">
+        <dt className="text-muted-foreground">Mode</dt><dd>{level.type === "forgot" ? "FORGOT IT!" : "STANDARD PACK"}</dd>
         <dt className="text-muted-foreground">Grid</dt><dd>{level.rows} × {level.cols}</dd>
         <dt className="text-muted-foreground">Usable cells</dt><dd>{level.usableCells}</dd>
         <dt className="text-muted-foreground">Occupied cells</dt><dd>{occupied}</dd>
         <dt className="text-muted-foreground">Occupancy</dt><dd>{((occupied / level.usableCells) * 100).toFixed(1)}%</dd>
         <dt className="text-muted-foreground">Items</dt><dd>{level.items.length}</dd>
-        <dt className="text-muted-foreground">Max solutions</dt><dd>{level.maxSolutions}</dd>
+        <dt className="text-muted-foreground">Valid final solutions</dt><dd>{result?.solutionCount ?? "not run"} (max {level.maxSolutions})</dd>
+        <dt className="text-muted-foreground">Minimum meaningful moves</dt><dd>{level.type === "forgot" ? level.minimumMeaningfulMoves : "—"}</dd>
+        <dt className="text-muted-foreground">Par moves</dt><dd>{level.parMoves}</dd>
+        <dt className="text-muted-foreground">Missing item</dt><dd>{level.missingInstanceId ? ITEMS[level.items.find((i) => i.instanceId === level.missingInstanceId)?.itemId ?? ""]?.name : "—"}</dd>
         <dt className="text-muted-foreground">Solver</dt>
-        <dd className={result ? (result.valid ? "font-bold text-valid" : "font-bold text-invalid") : ""}>
-          {result ? `${result.error ?? `${result.solutionCount} VALID SOLUTION${result.solutionCount > 1 ? "S" : ""}`} (${ms}ms)` : "not run"}
-        </dd>
+        <dd className={result ? (result.valid ? "font-bold text-valid" : "font-bold text-invalid") : ""}>{result ? `${result.error ?? "VALID"} (${ms}ms)` : "not run"}</dd>
         <dt className="text-muted-foreground">Difficulty</dt><dd>{difficulty(level.levelNumber)}</dd>
       </dl>
       <div className="mt-3 flex flex-wrap gap-2">
