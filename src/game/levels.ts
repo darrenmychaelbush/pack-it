@@ -1,21 +1,15 @@
 import { rotateN, shapesEqual } from "./engine";
 import type { Cell, LevelDefinition, LevelItem, Rotation, Shape, StartingPlacement } from "./types";
 
-interface Blob {
-  shape: Shape;
-  row: number;
-  col: number;
-}
+interface Blob { shape: Shape; row: number; col: number }
 
 function parseGrid(grid: string[]) {
   const blobs: Record<string, Cell[]> = {};
   const blocked: Cell[] = [];
-  grid.forEach((line, r) =>
-    [...line].forEach((ch, c) => {
-      if (ch === "#") blocked.push({ row: r, col: c });
-      else if (ch !== ".") (blobs[ch] ??= []).push({ row: r, col: c });
-    }),
-  );
+  grid.forEach((line, r) => [...line].forEach((ch, c) => {
+    if (ch === "#") blocked.push({ row: r, col: c });
+    else if (ch !== ".") (blobs[ch] ??= []).push({ row: r, col: c });
+  }));
   const out: Record<string, Blob> = {};
   for (const [k, cells] of Object.entries(blobs)) {
     const r0 = Math.min(...cells.map((c) => c.row));
@@ -23,13 +17,13 @@ function parseGrid(grid: string[]) {
     const h = Math.max(...cells.map((c) => c.row)) - r0 + 1;
     const w = Math.max(...cells.map((c) => c.col)) - c0 + 1;
     const shape: Shape = Array.from({ length: h }, () => Array(w).fill(0));
-    cells.forEach((c) => (shape[c.row - r0][c.col - c0] = 1));
+    cells.forEach((c) => { shape[c.row - r0][c.col - c0] = 1; });
     out[k] = { shape, row: r0, col: c0 };
   }
   return { blobs: out, blocked, rows: grid.length, cols: grid[0].length };
 }
 
-interface LevelSpec extends Omit<LevelDefinition, "rows" | "cols" | "blockedCells" | "items" | "startingPlacements" | "missingInstanceId" | "parMoves" | "weightLimit" | "passportStampId" | "usableCells" | "intendedSolution" | "maxSolutions"> {
+interface LevelSpec extends Omit<LevelDefinition, "rows" | "cols" | "blockedCells" | "items" | "startingPlacements" | "missingInstanceId" | "parMoves" | "weightLimit" | "passportStampId" | "usableCells" | "intendedSolution" | "maxSolutions" | "minimumMeaningfulMoves"> {
   grid: string[];
   legend: Record<string, string>;
   scramble?: "none" | "some" | "all";
@@ -38,25 +32,26 @@ interface LevelSpec extends Omit<LevelDefinition, "rows" | "cols" | "blockedCell
   slack?: number;
   par?: number;
   maxSolutions?: number;
+  minimumMeaningfulMoves?: number;
 }
 
 function buildLevel(spec: LevelSpec): LevelDefinition {
-  const { grid, legend, scramble = "none", start, missing, slack = 2, par, maxSolutions = 1, ...meta } = spec;
+  const { grid, legend, scramble = "none", start, missing, slack = 2, par, maxSolutions = 1, minimumMeaningfulMoves = 0, ...meta } = spec;
   const parsed = parseGrid(grid);
-  const items: LevelItem[] = Object.keys(parsed.blobs)
-    .sort()
-    .map((k, i) => {
-      const b = parsed.blobs[k];
-      let trayRotation: Rotation = 0;
-      if (scramble === "all") trayRotation = i % 2 ? 3 : 1;
-      if (scramble === "some" && i % 2 === 1) trayRotation = 1;
-      return { instanceId: `${legend[k]}-${k}`, itemId: legend[k], shape: b.shape, solution: { row: b.row, col: b.col }, trayRotation };
-    });
+  const keys = Object.keys(parsed.blobs).sort();
+  const items: LevelItem[] = keys.map((k, i) => {
+    const b = parsed.blobs[k];
+    let trayRotation: Rotation = 0;
+    if (scramble === "all") trayRotation = i % 2 ? 3 : 1;
+    if (scramble === "some" && i % 2 === 1) trayRotation = 1;
+    return { instanceId: `${legend[k]}-${k}`, itemId: legend[k], shape: b.shape, solution: { row: b.row, col: b.col }, trayRotation };
+  });
   const startingPlacements: Record<string, StartingPlacement> = {};
   if (start) {
     const s = parseGrid(start);
     for (const [k, b] of Object.entries(s.blobs)) {
-      const it = items.find((i) => i.instanceId === `${legend[k]}-${k}`)!;
+      const it = items.find((i) => i.instanceId === `${legend[k]}-${k}`);
+      if (!it) throw new Error(`Unknown start item ${k} in ${meta.id}`);
       const rot = ([0, 1, 2, 3] as Rotation[]).find((n) => shapesEqual(rotateN(it.shape, n), b.shape));
       if (rot === undefined) throw new Error(`Start shape mismatch for ${k} in ${meta.id}`);
       startingPlacements[it.instanceId] = { row: b.row, col: b.col, rotation: rot };
@@ -72,6 +67,7 @@ function buildLevel(spec: LevelSpec): LevelDefinition {
     missingInstanceId: missing ? `${legend[missing]}-${missing}` : undefined,
     weightLimit: null,
     parMoves: par ?? items.length + slack,
+    minimumMeaningfulMoves,
     usableCells: parsed.rows * parsed.cols - parsed.blocked.length,
     intendedSolution: items.map((i) => ({ instanceId: i.instanceId, row: i.solution.row, col: i.solution.col, rotation: 0 as Rotation })),
     maxSolutions,
@@ -79,9 +75,8 @@ function buildLevel(spec: LevelSpec): LevelDefinition {
   };
 }
 
-const START_FORGOT = [".CCCCE.", ".CFDDEE", "HHFFDDD", "GHHFDAD", "GGGGDAD", "...GAAA"];
-
 export const LEVELS: LevelDefinition[] = [
+  // Levels 1–2 are the approved baseline and intentionally unchanged.
   buildLevel({
     id: "nashville", levelNumber: 1, type: "standard", destination: "Nashville", country: "USA", flag: "🇺🇸", landmark: "🎸",
     tripType: "City Trip", days: 3, weather: "68° – 79°", tagline: "Boots, hats and live music on Broadway.",
@@ -96,76 +91,74 @@ export const LEVELS: LevelDefinition[] = [
   }),
   buildLevel({
     id: "san-diego", levelNumber: 3, type: "standard", destination: "San Diego", country: "USA", flag: "🇺🇸", landmark: "🌊",
-    tripType: "Beach Trip", days: 3, weather: "66° – 75°", tagline: "Surf breaks and sunset tacos.",
-    grid: ["BBACCC", "BAAACF", "EEA#DF", "EEDDDF", "#GGDFF", "#.GGF#"],
-    legend: { A: "shirt", B: "camera", C: "shorts", D: "towel", E: "sunhat", F: "sandals", G: "sunscreen" },
+    tripType: "Coastal Trip", days: 3, weather: "66° – 75°", tagline: "Make the long beach towel work for you.",
+    grid: ["DDFFFF#", "#BBCCGG", ".BBCCGG", "#AAEEGG", ".AAEE#."],
+    legend: { A: "shirt", B: "shorts", C: "sneakers", D: "sunscreen", E: "camera", F: "towel", G: "jacket" },
     scramble: "some", maxSolutions: 2,
   }),
   buildLevel({
-    id: "new-york", levelNumber: 4, type: "standard", destination: "New York", country: "USA", flag: "🇺🇸", landmark: "🗽",
-    tripType: "City Trip", days: 4, weather: "55° – 66°", tagline: "Museums by day, Broadway by night.",
-    grid: ["AAABBC#", "DABBCCC", "DAGEECF", "DAG#EEF", "GGGGHFF", ".G.HHHH"],
-    legend: { A: "coat", B: "sneakers", C: "sweater", D: "umbrella", E: "camera", F: "scarf", G: "jeans", H: "toiletry" },
-    scramble: "some",
+    id: "new-york", levelNumber: 4, type: "forgot", destination: "New York", country: "USA", flag: "🇺🇸", landmark: "🗽",
+    tripType: "Forgot It!", days: 4, weather: "55° – 66°", tagline: "Packed for Manhattan… except for one thing.",
+    missingMessage: "You forgot your dress shoes. Make room without unpacking!",
+    grid: ["HHBBAA", "HHBBAA", "CCC#AA", "CCCGG#", "EEFFDD", "EEFFDD"],
+    start: ["CCBBAA", "CCBBAA", "CC.#AA", "EEFF.#", "EEFFDD", "GG..DD"],
+    legend: { A: "jeans", B: "shirt", C: "jacket", D: "sneakers", E: "camera", F: "toiletry", G: "charger", H: "dressshoes" },
+    missing: "H", par: 6, minimumMeaningfulMoves: 4,
   }),
   buildLevel({
-    id: "miami-forgot", levelNumber: 5, type: "forgot", destination: "Miami", country: "USA", flag: "🇺🇸", landmark: "🩴",
-    tripType: "Forgot It!", days: 4, weather: "80° – 89°", tagline: "Your bag is packed… almost.",
-    missingMessage: "You forgot your beach sandals. Make room so they fit!",
-    grid: ["AAABECC", "DADBEEC", "DADBGGC", "DDDBGFC", "HHDDGFF", "#HHGG.F"],
-    start: START_FORGOT,
-    legend: { A: "aloha", B: "sandals", C: "towel", D: "dress", E: "sunscreen", F: "snorkel", G: "swimsuit", H: "sunglasses" },
-    missing: "B",
-    par: 6,
-  }),
-  buildLevel({
-    id: "honolulu", levelNumber: 6, type: "standard", destination: "Honolulu", country: "USA", flag: "🇺🇸", landmark: "🌺",
-    tripType: "Vacation", days: 5, weather: "75° – 85°", tagline: "Turn things around to make them fit.",
-    grid: ["AAABCC#", "ADABBCC", "EDDDBCH", "EEEDBBH", "EFGGBHH", "#FFGG##"],
-    legend: { A: "toiletry", B: "snorkel", C: "towel", D: "dress", E: "aloha", F: "sunscreen", G: "lei", H: "swimsuit" },
+    id: "honolulu", levelNumber: 5, type: "standard", destination: "Honolulu", country: "USA", flag: "🇺🇸", landmark: "🌺",
+    tripType: "Vacation", days: 5, weather: "75° – 85°", tagline: "Turn the long gear around to make it fit.",
+    grid: ["#HGGGG", "HHHCC#", "#BBCC.", "EBBFF#", "EAAFFD", "EAA.#D"],
+    legend: { A: "swimsuit", B: "shorts", C: "sandals", D: "sunscreen", E: "snorkel", F: "shirt", G: "towel", H: "sunhat" },
     scramble: "all", maxSolutions: 2,
   }),
   buildLevel({
-    id: "mexico-city", levelNumber: 7, type: "standard", destination: "Mexico City", country: "Mexico", flag: "🇲🇽", landmark: "🌮",
-    tripType: "City Trip", days: 5, weather: "54° – 75°", tagline: "Markets, murals and mole.",
-    grid: ["#DAAABB", "DDABBBE", "CDDDBEE", "CCD#EEF", "CGDHEIF", "GGGHIIF", "#GHH##F"],
-    legend: { A: "shirt", B: "jeans", C: "sombrero", D: "poncho", E: "sweater", F: "umbrella", G: "toiletry", H: "camera", I: "sunglasses" },
-    scramble: "all", slack: 1,
+    id: "mexico-city", levelNumber: 6, type: "forgot", destination: "Mexico City", country: "Mexico", flag: "🇲🇽", landmark: "🌮",
+    tripType: "Forgot It!", days: 5, weather: "54° – 75°", tagline: "Markets, murals… and a camera left behind.",
+    missingMessage: "You forgot your camera bag. Repack without removing anything!",
+    grid: ["FFGGGG", "FFEEE#", "BBEEEH", "BBAAAH", "DDAAA#", "DDCCII", ".#CCII"],
+    start: ["FFEEE.", "FFEEE#", "BBHH..", "BBGGGG", "DDAA.#", "DDAACC", ".#AACC"],
+    legend: { A: "jeans", B: "shirt", C: "aloha", D: "sneakers", E: "jacket", F: "toiletry", G: "umbrella", H: "charger", I: "camerabag" },
+    missing: "I", par: 11, minimumMeaningfulMoves: 9,
   }),
   buildLevel({
-    id: "vancouver", levelNumber: 8, type: "standard", destination: "Vancouver", country: "Canada", flag: "🇨🇦", landmark: "🏔️",
-    tripType: "Adventure Trip", days: 5, weather: "48° – 62°", tagline: "Mountains, rain and odd-shaped gear.",
-    grid: ["AABBBCC#", "DAABBBCC", "DDABEECC", "DDAEEFFF", "DGHHEFFF", "GGGHHIII", "#G#HHHII"],
-    legend: { A: "scarf", B: "jacket", C: "sweater", D: "boots", E: "camera", F: "toiletry", G: "gloves", H: "coat", I: "umbrella" },
-    scramble: "some", slack: 1,
+    id: "vancouver", levelNumber: 7, type: "standard", destination: "Vancouver", country: "Canada", flag: "🇨🇦", landmark: "🏔️",
+    tripType: "Adventure Trip", days: 5, weather: "48° – 62°", tagline: "Bulky trail gear leaves no room to waste.",
+    grid: ["D#GG#E", "DCCBBE", "DCCBBE", "HHHBBE", "HHHAAA", "#FFAAA", ".FFAAA"],
+    legend: { A: "raincoat", B: "boots", C: "camera", D: "scarf", E: "umbrella", F: "sweater", G: "gloves", H: "hikingpants" },
+    scramble: "some",
   }),
   buildLevel({
-    id: "london", levelNumber: 9, type: "standard", destination: "London", country: "United Kingdom", flag: "🇬🇧", landmark: "💂",
-    tripType: "International Trip", days: 5, weather: "50° – 61°", tagline: "Watch out for the wheels and handle.",
-    grid: ["#AAAABB#", "CAAABBDF", "CCCEEBDF", "CGGGEEDF", "#HGGEDDF", "HHHIEDJF", "HHIIIJJF", "#H.IJJJ#"],
-    legend: { A: "trench", B: "boots", C: "tea", D: "scarf", E: "jeans", F: "umbrella", G: "camera", H: "sweater", I: "tee", J: "toiletry" },
-    scramble: "some", slack: 1,
+    id: "london", levelNumber: 8, type: "forgot", destination: "London", country: "United Kingdom", flag: "🇬🇧", landmark: "💂",
+    tripType: "Forgot It! · Hard", days: 5, weather: "50° – 61°", tagline: "Even a small adapter can cause a big problem.",
+    missingMessage: "You forgot your travel adapter. Find the six-move chain!",
+    grid: ["DDHHC#I", "DDHHCCI", "AAAGGCI", "AAAGGBB", "AAAJJBB", "#FFJJBB", "FFFEEEE"],
+    start: ["DDHH.#.", "DDHH.C.", "AAAGGCC", "AAAGGEC", "AAABBEI", "#FFBBEI", "FFFBBEI"],
+    legend: { A: "trench", B: "jeans", C: "dressshoes", D: "sweater", E: "umbrella", F: "camera", G: "toiletry", H: "shirt", I: "scarf", J: "adapterkit" },
+    missing: "J", par: 8, minimumMeaningfulMoves: 6,
+  }),
+  buildLevel({
+    id: "tokyo", levelNumber: 9, type: "standard", destination: "Tokyo", country: "Japan", flag: "🇯🇵", landmark: "🗼",
+    tripType: "International City Trip", days: 6, weather: "58° – 70°", tagline: "Every narrow space matters in Tokyo.",
+    grid: ["#CC##DD#", "JCCGGDD#", "JEEGGAAA", "#EEGGAAA", "HHFFIIII", "HHFFBBB#", "#KK#BBB#"],
+    legend: { A: "jacket", B: "jeans", C: "shirt", D: "aloha", E: "sneakers", F: "camera", G: "daybag", H: "toiletry", I: "umbrella", J: "powerbank", K: "adapter" },
+    scramble: "all", par: 13,
   }),
   buildLevel({
     id: "paris", levelNumber: 10, type: "standard", destination: "Paris", country: "France", flag: "🇫🇷", landmark: "🗼",
-    tripType: "City Trip", days: 5, weather: "57° – 68°", tagline: "Every trick you've learned, all at once.",
-    grid: ["#AAAABC#", "DDEEABCC", "DDDEEBHC", "#DFFGGHC", "IFFGGHHH", "IIIIGH#H", "IJIJGKKH", "#JJJGKK#"],
-    legend: { A: "baguette", B: "umbrella", C: "scarf", D: "dress", E: "macarons", F: "sneakers", G: "trench", H: "jeans", I: "sweater", J: "toiletry", K: "beret" },
-    scramble: "all", slack: 1,
+    tripType: "Milestone City Trip", days: 6, weather: "57° – 68°", tagline: "Your first packing masterclass.",
+    grid: ["CCBB##J#", "CCBBHHJI", "CCBBHHJI", "#GGEEAAI", "KGGEEAAI", "KDDFFAA#", "#DDFF###"],
+    legend: { A: "jacket", B: "dress", C: "jeans", D: "shirt", E: "dressshoes", F: "sneakers", G: "camera", H: "toiletry", I: "umbrella", J: "scarf", K: "accessory" },
+    scramble: "all", par: 14,
   }),
   buildLevel({
     id: "santorini", levelNumber: 11, type: "standard", destination: "Santorini", country: "Greece", flag: "🇬🇷", landmark: "🏛️",
-    tripType: "3-Day Beach Trip", days: 3, weather: "72° – 82°", tagline: "Whitewashed cliffs and Aegean blue.",
+    tripType: "Beach Trip", days: 3, weather: "72° – 82°", tagline: "Whitewashed cliffs and Aegean blue.",
     grid: ["AAABBCC#", "DAAABBCC", "DDEEBCCF", "DDEE#GGF", "DIIHHGFF", "IIIHGGFJ", "IIIHHGFJ", "##.HGGJJ"],
     legend: { A: "sandals", B: "shorts", C: "linen", D: "sunhat", E: "camera", F: "sunscreen", G: "swimsuit", H: "toiletry", I: "towel", J: "sunglasses" },
     scramble: "some", slack: 1,
   }),
 ];
 
-export function getLevel(id: string) {
-  return LEVELS.find((l) => l.id === id);
-}
-
-export function getNextLevel(level: LevelDefinition) {
-  return LEVELS.find((l) => l.levelNumber === level.levelNumber + 1);
-}
+export function getLevel(id: string) { return LEVELS.find((l) => l.id === id); }
+export function getNextLevel(level: LevelDefinition) { return LEVELS.find((l) => l.levelNumber === level.levelNumber + 1); }

@@ -214,3 +214,20 @@
   100% { box-shadow: 0 0 0 14px transparent; }
 }
 .pulse-ring { animation: pulse-ring 1.6s ease-out infinite; }
+
+/* Travel-journal progression */
+.travel-transition { transition: opacity 160ms ease; }
+.travel-land { fill: color-mix(in oklab, var(--accent) 60%, var(--background)); stroke: var(--border); stroke-width: 2; }
+.travel-route { fill: none; stroke: var(--foreground); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 0.025 0.04; opacity: 0.8; }
+.travel-pin { stroke: var(--background); stroke-width: 4; }
+.travel-pin-done { fill: var(--success); }
+.travel-pin-next { fill: var(--primary); transform-origin: 312px 76px; animation: destination-pop 420ms 1.35s both; }
+.travel-label { fill: var(--foreground); font-family: var(--font-sans); font-size: 11px; font-weight: 800; }
+.travel-label-next { text-anchor: middle; }
+.travel-plane { fill: var(--foreground); filter: drop-shadow(0 3px 3px oklch(0 0 0 / 0.2)); }
+@keyframes destination-pop { 0% { transform: scale(0.2); opacity: 0; } 70% { transform: scale(1.35); } 100% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .travel-plane { display: none; }
+  .travel-pin-next { animation: none; }
+  .travel-transition { transition: none; }
+}

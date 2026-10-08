@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ItemBlocks } from "./ItemBlocks";
 import { Stamp, Stars } from "./Stamp";
+import { TravelTransition } from "./TravelTransition";
 import {
   calculateStars,
   canPlaceItem,
@@ -20,10 +21,11 @@ import { ITEMS } from "@/game/items";
 import { getNextLevel } from "@/game/levels";
 import { feedback } from "@/game/feedback";
 import { clearSavedPuzzle, loadSavedPuzzle, recordCompletion, restoreSavedPuzzle, savePuzzle, toSavedPuzzle, useProgress } from "@/game/progress";
+import { transitionFor } from "@/game/transitions";
 import type { GameItems, LevelDefinition, Rotation, Shape } from "@/game/types";
 import { cn } from "@/lib/utils";
 
-type Phase = "briefing" | "playing" | "zipping" | "results";
+type Phase = "briefing" | "playing" | "zipping" | "results" | "traveling";
 interface Ghost {
   row: number;
   col: number;
@@ -230,6 +232,12 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
       }
       const t = trayRef.current?.getBoundingClientRect();
       if (source === "board" && t && ev.clientY >= t.top) {
+        // Forgot It! is rearrangement-only: anything that began packed stays inside.
+        if (level.type === "forgot" && id !== level.missingInstanceId) {
+          shake(id);
+          toast("Keep packed items in the suitcase", { duration: 1200 });
+          return;
+        }
         setItems(removeItem(itemsRef.current, id));
         return;
       }
@@ -504,11 +512,24 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
           onReplay={restart}
           onNext={() => {
             const next = getNextLevel(level);
-            if (next) navigate({ to: "/play/$levelId", params: { levelId: next.id } });
+            if (next) setPhase("traveling");
             else navigate({ to: "/passport" });
           }}
         />
       )}
+      {phase === "traveling" && (() => {
+        const next = getNextLevel(level);
+        if (!next) return null;
+        const transition = transitionFor(level.id, next.id, level.levelNumber, next.levelNumber);
+        return (
+          <TravelTransition
+            from={level}
+            to={next}
+            transition={transition}
+            onArrive={() => navigate({ to: "/play/$levelId", params: { levelId: next.id } })}
+          />
+        );
+      })()}
     </div>
   );
 }
