@@ -119,7 +119,7 @@ export const LEVELS: LevelDefinition[] = [
     grid: ["FFGGGG", "FFEEE#", "BBEEEH", "BBAAAH", "DDAAA#", "DDCCII", ".#CCII"],
     start: ["FFEEE.", "FFEEE#", "BBHH..", "BBGGGG", "DDAA.#", "DDAACC", ".#AACC"],
     legend: { A: "jeans", B: "shirt", C: "aloha", D: "sneakers", E: "jacket", F: "toiletry", G: "umbrella", H: "charger", I: "camerabag" },
-    missing: "I", par: 7, minimumMeaningfulMoves: 5,
+    missing: "I", par: 11, minimumMeaningfulMoves: 9,
   }),
   buildLevel({
     id: "vancouver", levelNumber: 7, type: "standard", destination: "Vancouver", country: "Canada", flag: "🇨🇦", landmark: "🏔️",
