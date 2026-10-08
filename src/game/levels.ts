@@ -85,16 +85,14 @@ export const LEVELS: LevelDefinition[] = [
   buildLevel({
     id: "nashville", levelNumber: 1, type: "standard", destination: "Nashville", country: "USA", flag: "🇺🇸", landmark: "🎸",
     tripType: "City Trip", days: 3, weather: "68° – 79°", tagline: "Boots, hats and live music on Broadway.",
-    grid: ["AB.C#", "ABBCC", "ABCCE", "ADDCE", "DD.CE"],
-    legend: { A: "jeans", B: "shirt", C: "boots", D: "cowboyhat", E: "guitar" },
-    maxSolutions: 2,
+    grid: ["AAE##.", "AAECCC", "AAECCC", "#DEBB#", "DDDBB."],
+    legend: { A: "jeans", B: "shirt", C: "cowboyboots", D: "cowboyhat", E: "guitar" },
   }),
   buildLevel({
     id: "miami", levelNumber: 2, type: "standard", destination: "Miami", country: "USA", flag: "🇺🇸", landmark: "🌴",
     tripType: "Beach Trip", days: 4, weather: "78° – 88°", tagline: "Sun, sand and Art Deco nights.",
-    grid: ["AABBBB", "AADDDC", "DDDECC", "FFEEEE", ".FF.E."],
-    legend: { A: "trunks", B: "sunglasses", C: "sunscreen", D: "towel", E: "aloha", F: "swimsuit" },
-    maxSolutions: 2,
+    grid: ["AADDDD", "AA.EE#", ".FFEEC", "#FFGGC", "BB#GG#"],
+    legend: { A: "trunks", B: "sunglasses", C: "sunscreen", D: "towel", E: "swimsuit", F: "sandals", G: "aloha" },
   }),
   buildLevel({
     id: "san-diego", levelNumber: 3, type: "standard", destination: "San Diego", country: "USA", flag: "🇺🇸", landmark: "🌊",

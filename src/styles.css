@@ -126,9 +126,14 @@
 .suitcase-lining {
   background-color: var(--lining);
   background-image:
-    linear-gradient(oklch(1 0 0 / 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(1 0 0 / 0.06) 1px, transparent 1px);
+    linear-gradient(oklch(1 0 0 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.025) 1px, transparent 1px);
   box-shadow: inset 0 4px 14px oklch(0 0 0 / 0.35);
+}
+.suitcase-lining.show-grid {
+  background-image:
+    linear-gradient(oklch(1 0 0 / 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.1) 1px, transparent 1px);
 }
 .suitcase-handle {
   border: 6px solid var(--shell);

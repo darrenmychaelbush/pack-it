@@ -18,3 +18,5 @@
 - Progress goes through the `ProgressStore` interface in `src/game/progress.ts` (localStorage today) so a cloud store can replace it without touching gameplay.
 - Dragging uses Pointer Events with window listeners and transform-positioned floating items, never native HTML drag-and-drop — required for smooth touch play.
 - `noUncheckedIndexedAccess` is off: the engine indexes dense grid/shape matrices whose bounds are checked explicitly.
+- Realistic packed footprints and item artwork live in `src/game/sizes.ts`; size-checked levels must use those footprints (tested) — keeps relative item sizes believable.
+- Unfinished puzzles are saved through `ProgressStore` puzzle methods, separate from completed progress, and cleared on completion — lets players exit and resume safely.

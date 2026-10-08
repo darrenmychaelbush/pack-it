@@ -12,7 +12,7 @@ const def = (
 
 export const ITEMS: Record<string, PackingItemDefinition> = Object.fromEntries(
   [
-    def("shirt", "Shirt", "👕", "oklch(0.62 0.13 245)"),
+    def("shirt", "Polo Shirt", "👕", "oklch(0.62 0.13 245)"),
     def("aloha", "Aloha Shirt", "🌺", "oklch(0.66 0.14 225)", "clothes", 0.4, ["beach"]),
     def("linen", "Linen Shirt", "👔", "oklch(0.9 0.03 85)"),
     def("tee", "Striped Tee", "👕", "oklch(0.7 0.1 240)"),
@@ -30,6 +30,7 @@ export const ITEMS: Record<string, PackingItemDefinition> = Object.fromEntries(
     def("towel", "Beach Towel", "🏖️", "oklch(0.72 0.1 220)", "essentials", 0.6, ["beach"]),
     def("sneakers", "Sneakers", "👟", "oklch(0.93 0.01 250)", "shoes", 0.8),
     def("sandals", "Sandals", "🩴", "oklch(0.66 0.09 60)", "shoes", 0.4, ["beach"]),
+    def("cowboyboots", "Cowboy Boots", "👢", "oklch(0.55 0.1 50)", "shoes", 1.2),
     def("boots", "Hiking Boots", "🥾", "oklch(0.5 0.08 55)", "shoes", 1.1),
     def("cowboyhat", "Cowboy Hat", "🤠", "oklch(0.62 0.1 60)", "accessories", 0.4),
     def("sunhat", "Sun Hat", "👒", "oklch(0.8 0.08 80)", "accessories", 0.3),

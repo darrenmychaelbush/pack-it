@@ -1,4 +1,6 @@
 import type { PackingItemDefinition, Shape } from "@/game/types";
+import { rotateN, shapesEqual } from "@/game/engine";
+import { PACKED_SIZES } from "@/game/sizes";
 
 interface Props {
   shape: Shape;
@@ -6,10 +8,50 @@ interface Props {
   item: PackingItemDefinition;
   selected?: boolean;
   className?: string;
+  packed?: boolean;
 }
 
 /** Renders an item as a single soft packing-cube object following its logical shape. */
-export function ItemBlocks({ shape, cell, item, selected, className }: Props) {
+export function ItemBlocks(props: Props) {
+  const lib = PACKED_SIZES[props.item.id];
+  const k = lib?.art ? [0, 1, 2, 3].find((n) => shapesEqual(rotateN(lib.shape, n), props.shape)) : undefined;
+  if (lib?.art && k !== undefined) return <ItemArt {...props} art={lib.art} native={lib.shape} turns={k} />;
+  return <ItemCube {...props} />;
+}
+
+/** The illustrated object itself is the piece: artwork fills its footprint, rotated with it. */
+function ItemArt({ shape, cell, item, selected, className, art, native, turns }: Props & { art: string; native: Shape; turns: number }) {
+  const W = shape[0].length * cell;
+  const H = shape.length * cell;
+  const inset = Math.max(1.5, cell * 0.04);
+  const nw = native[0].length * cell - inset * 2;
+  const nh = native.length * cell - inset * 2;
+  return (
+    <div className={className} style={{ position: "relative", width: W, height: H }}>
+      {selected && (
+        <div style={{ position: "absolute", inset: 0, borderRadius: cell * 0.2, background: "color-mix(in oklab, var(--gold) 22%, transparent)", outline: "2px solid var(--gold)" }} />
+      )}
+      <img
+        src={art}
+        alt={item.name}
+        draggable={false}
+        style={{
+          position: "absolute",
+          left: W / 2 - nw / 2,
+          top: H / 2 - nh / 2,
+          width: nw,
+          height: nh,
+          objectFit: "fill",
+          transform: `rotate(${turns * 90}deg)`,
+          pointerEvents: "none",
+          filter: "drop-shadow(0 2px 2px oklch(0 0 0 / 0.35))",
+        }}
+      />
+    </div>
+  );
+}
+
+function ItemCube({ shape, cell, item, selected, className }: Props) {
   const r = cell * 0.24;
   const filled: { i: number; j: number }[] = [];
   shape.forEach((row, i) => row.forEach((v, j) => v && filled.push({ i, j })));

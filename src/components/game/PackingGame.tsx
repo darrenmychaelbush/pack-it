@@ -1,6 +1,7 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, Lightbulb, RotateCcw, RotateCw } from "lucide-react";
+import { Lightbulb, RotateCcw, RotateCw, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ItemBlocks } from "./ItemBlocks";
 import { Stamp, Stars } from "./Stamp";
@@ -18,7 +19,7 @@ import {
 import { ITEMS } from "@/game/items";
 import { getNextLevel } from "@/game/levels";
 import { feedback } from "@/game/feedback";
-import { recordCompletion, useProgress } from "@/game/progress";
+import { clearSavedPuzzle, loadSavedPuzzle, recordCompletion, restoreSavedPuzzle, savePuzzle, toSavedPuzzle, useProgress } from "@/game/progress";
 import type { GameItems, LevelDefinition, Rotation, Shape } from "@/game/types";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +75,47 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
   movesRef.current = moves;
   const hintRef = useRef(hintUsed);
   hintRef.current = hintUsed;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const [resume, setResume] = useState<{ items: GameItems; moves: number; hintUsed: boolean } | null>(null);
+
+  // Look for an unfinished save after mount (localStorage is client-only).
+  useEffect(() => {
+    const saved = loadSavedPuzzle(level.id);
+    if (!saved) return;
+    const restored = restoreSavedPuzzle(level, saved);
+    if (restored) setResume({ items: restored, moves: saved.moveCount, hintUsed: saved.hintUsed });
+    else clearSavedPuzzle(level.id);
+  }, [level]);
+
+  const saveNow = useCallback(() => {
+    if (phaseRef.current !== "playing") return;
+    savePuzzle(toSavedPuzzle(level, itemsRef.current, movesRef.current, hintRef.current));
+  }, [level]);
+
+  // Autosave after every state change while playing (placement, move, rotation, hint, reset).
+  useEffect(() => {
+    if (phase === "playing") saveNow();
+  }, [items, moves, hintUsed, phase, saveNow]);
+
+  useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && saveNow();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", saveNow);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", saveNow);
+    };
+  }, [saveNow]);
+
+  const exitPuzzle = () => {
+    if (phase === "playing") {
+      saveNow();
+      toast("Progress saved", { duration: 1000 });
+    }
+    navigate({ to: "/" });
+  };
+
   const dragInfo = useRef<{ x: number; y: number; offX: number; offY: number; shape: Shape } | null>(null);
 
   const packedCount = level.items.filter((i) => items[i.instanceId].placement).length;
@@ -257,9 +299,9 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
     <div className="mx-auto flex h-dvh max-w-md select-none flex-col overflow-hidden" style={{ touchAction: "none" }}>
       {/* Header */}
       <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 pb-2 pt-3">
-        <Link to="/" aria-label="Back to map" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-card shadow-soft">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
+        <button type="button" onClick={exitPuzzle} aria-label="Save and exit to trips" className="relative z-[60] grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-card shadow-soft">
+          <X className="h-5 w-5" />
+        </button>
         <div className="min-w-0 text-center">
           <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Level {level.levelNumber} · {level.tripType}</div>
           <h1 className="truncate text-xl font-semibold leading-tight">
@@ -291,7 +333,7 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
           <div className="suitcase-shell relative rounded-[22px] p-2.5">
             <div
               ref={boardRef}
-              className="suitcase-lining relative overflow-visible rounded-xl"
+              className={cn("suitcase-lining relative overflow-visible rounded-xl", dragId && "show-grid")}
               style={{ width: level.cols * cell, height: level.rows * cell, backgroundSize: `${cell}px ${cell}px` }}
             >
               {level.blockedCells.map((b) => (
@@ -330,7 +372,7 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
                     >
                       {/* Only filled cells catch the pointer so irregular gaps stay usable */}
                       <div className="relative">
-                        <ItemBlocks shape={shape} cell={cell} item={ITEMS[it.itemId]} selected={selected === it.instanceId} />
+                        <ItemBlocks shape={shape} cell={cell} item={ITEMS[it.itemId]} selected={selected === it.instanceId} packed />
                         {getOccupiedCells(shape, 0, 0).map((c) => (
                           <div key={`${c.row}-${c.col}`} className="absolute" style={{ top: c.row * cell, left: c.col * cell, width: cell, height: cell, pointerEvents: "auto" }} />
                         ))}
@@ -435,7 +477,25 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
         </div>
       )}
 
-      {phase === "briefing" && <Briefing level={level} best={prevBest?.stars ?? 0} onStart={() => setPhase("playing")} />}
+      {phase === "briefing" && (
+        <Briefing
+          level={level}
+          best={prevBest?.stars ?? 0}
+          canContinue={!!resume}
+          onStart={() => {
+            if (resume) {
+              setItems(resume.items);
+              setMoves(resume.moves);
+              setHintUsed(resume.hintUsed);
+            }
+            setPhase("playing");
+          }}
+          onRestart={() => {
+            setResume(null);
+            restart();
+          }}
+        />
+      )}
       {phase === "results" && result && (
         <Results
           level={level}
@@ -465,7 +525,9 @@ function Postcard({ level }: { level: LevelDefinition }) {
   );
 }
 
-function Briefing({ level, best, onStart }: { level: LevelDefinition; best: number; onStart: () => void }) {
+function Briefing({
+  level, best, canContinue, onStart, onRestart,
+}: { level: LevelDefinition; best: number; canContinue: boolean; onStart: () => void; onRestart: () => void }) {
   const counts = new Map<string, number>();
   level.items.forEach((i) => counts.set(i.itemId, (counts.get(i.itemId) ?? 0) + 1));
   return (
@@ -506,8 +568,13 @@ function Briefing({ level, best, onStart }: { level: LevelDefinition; best: numb
             ))}
           </div>
           <Button variant="success" size="xl" className="mt-5" onClick={onStart}>
-            {level.type === "forgot" ? "Make It Fit!" : "Start Packing"}
+            {canContinue ? "Continue Packing" : level.type === "forgot" ? "Make It Fit!" : "Start Packing"}
           </Button>
+          {canContinue && (
+            <Button variant="paper" className="mt-2 h-11 w-full" onClick={onRestart}>
+              <RotateCcw /> Restart Level
+            </Button>
+          )}
         </div>
       </div>
     </div>
