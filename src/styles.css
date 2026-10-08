@@ -215,19 +215,39 @@
 }
 .pulse-ring { animation: pulse-ring 1.6s ease-out infinite; }
 
-/* Travel-journal progression */
-.travel-transition { transition: opacity 160ms ease; }
-.travel-land { fill: color-mix(in oklab, var(--accent) 60%, var(--background)); stroke: var(--border); stroke-width: 2; }
-.travel-route { fill: none; stroke: var(--foreground); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 0.025 0.04; opacity: 0.8; }
-.travel-pin { stroke: var(--background); stroke-width: 4; }
-.travel-pin-done { fill: var(--success); }
-.travel-pin-next { fill: var(--primary); transform-origin: 312px 76px; animation: destination-pop 420ms 1.35s both; }
-.travel-label { fill: var(--foreground); font-family: var(--font-sans); font-size: 11px; font-weight: 800; }
-.travel-label-next { text-anchor: middle; }
-.travel-plane { fill: var(--foreground); filter: drop-shadow(0 3px 3px oklch(0 0 0 / 0.2)); }
+/* Geographic travel atlas: colors are shared semantic map tokens. */
+:root {
+  --atlas-ocean: oklch(0.87 0.048 224);
+  --atlas-land: oklch(0.965 0.022 85);
+  --atlas-boundary: oklch(0.73 0.025 85);
+  --atlas-route: var(--foreground);
+  --atlas-shadow: 0 3px 4px oklch(0.27 0.06 262 / 0.22);
+}
+.travel-transition { background: var(--atlas-ocean); isolation: isolate; }
+.travel-transition > div, .travel-transition footer { pointer-events: none; }
+.travel-transition footer button { pointer-events: auto; }
+.travel-atlas-heading, .travel-transition footer { background: var(--background); }
+.travel-atlas { width: 100%; height: 100%; overflow: hidden; }
+.travel-countries { fill: var(--atlas-land); stroke: var(--atlas-boundary); stroke-width: 0.65; stroke-linejoin: round; }
+.travel-route-guide { fill: none; stroke: var(--atlas-route); stroke-width: 1.5; opacity: 0.12; }
+.travel-route { fill: none; stroke: var(--atlas-route); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1 10; }
+.travel-origin-stamp { fill: var(--atlas-land); stroke: var(--stamp); stroke-width: 2; animation: atlas-origin 550ms 150ms both; }
+.travel-origin-stamp circle:first-child { stroke-dasharray: 2 2; }
+.travel-origin-stamp path { fill: none; stroke-width: 3; }
+.travel-destination-pin { fill: var(--primary); stroke: var(--card); stroke-width: 2; }
+.travel-pin-halo { fill: var(--primary); stroke: none; opacity: 0.18; }
+.travel-pin-center { fill: var(--card); stroke: none; }
+.travel-destination-pin.is-arrived { animation: destination-pop 400ms both; }
+.travel-label { fill: var(--foreground); stroke: var(--atlas-land); stroke-width: 5px; paint-order: stroke; font-family: var(--font-sans); font-size: 21px; font-weight: 900; }
+@media (max-width: 600px) { .travel-label { font-size: 17px; } }
+.travel-plane { fill: var(--atlas-route); stroke: var(--card); stroke-width: 1; filter: drop-shadow(var(--atlas-shadow)); }
+.travel-plane-detail { fill: none; stroke: var(--card); stroke-width: 1; opacity: 0.7; }
+.travel-arrived-title { animation: atlas-title 300ms both; }
+@keyframes atlas-title { from { transform: translateY(5px); } to { transform: translateY(0); } }
+@keyframes atlas-origin { 50% { transform: scale(1.2); } }
 @keyframes destination-pop { 0% { transform: scale(0.2); opacity: 0; } 70% { transform: scale(1.35); } 100% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .travel-plane { display: none; }
-  .travel-pin-next { animation: none; }
+  .travel-destination-pin.is-arrived, .travel-origin-stamp, .travel-arrived-title { animation: none; }
   .travel-transition { transition: none; }
 }
