@@ -13,13 +13,24 @@ interface Props {
 }
 
 export function TravelTransition({ from, to, transition, onArrive }: Props) {
-  const geography = useMemo(() => createTravelGeography(from.id, to.id), [from.id, to.id]);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 600, height: 640 });
+  const geography = useMemo(() => createTravelGeography(from.id, to.id, dimensions.width, dimensions.height), [from.id, to.id, dimensions]);
   const [atlas, setAtlas] = useState<FeatureCollection | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [reduced, setReduced] = useState(false);
   const done = useRef(false);
   const arriveRef = useRef(onArrive);
   arriveRef.current = onArrive;
+  useEffect(() => {
+    const element = mapRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) setDimensions({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const skip = () => {
     if (done.current) return;
     done.current = true;
@@ -58,8 +69,8 @@ export function TravelTransition({ from, to, transition, onArrive }: Props) {
         <h2 className={`mt-2 font-display text-4xl font-semibold ${arrived ? "travel-arrived-title" : ""}`}>{to.flag} {to.destination}</h2>
         <p className="mt-1 text-sm font-extrabold uppercase text-primary">{to.tripType}</p>
       </div>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center">
-        <svg viewBox="0 0 600 640" className="travel-atlas" role="img" aria-label={`Geographic flight route from ${from.destination} to ${to.destination}`}>
+      <div ref={mapRef} className="relative flex min-h-0 flex-1 items-center justify-center">
+        <svg viewBox={`0 0 ${dimensions.width} ${dimensions.height}`} className="travel-atlas" role="img" aria-label={`Geographic flight route from ${from.destination} to ${to.destination}`}>
           <g className="travel-countries">{countryPaths}</g>
           <path d={geography.path(1)} className="travel-route-guide" />
           {ink > 0 && <path d={geography.path(ink)} className="travel-route" />}

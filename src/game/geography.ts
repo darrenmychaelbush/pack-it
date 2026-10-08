@@ -26,7 +26,7 @@ export function warmTravelAtlas(): Promise<FeatureCollection> {
   return atlasPromise;
 }
 
-export function createTravelGeography(fromId: string, toId: string) {
+export function createTravelGeography(fromId: string, toId: string, width = ATLAS_WIDTH, height = ATLAS_HEIGHT) {
   const from = DESTINATION_COORDINATES[fromId];
   const to = DESTINATION_COORDINATES[toId];
   if (!from || !to) throw new Error(`Missing destination coordinates: ${fromId} → ${toId}`);
@@ -41,11 +41,11 @@ export function createTravelGeography(fromId: string, toId: string) {
   const xMax = Math.max(...raw.map((p) => p[0]));
   const yMin = Math.min(...raw.map((p) => p[1]));
   const yMax = Math.max(...raw.map((p) => p[1]));
-  const scale = Math.min(360 / Math.max(xMax - xMin, 0.03), 340 / Math.max(yMax - yMin, 0.03));
+  const scale = Math.min(width * 0.6 / Math.max(xMax - xMin, 0.03), height * 0.53 / Math.max(yMax - yMin, 0.03));
   projection.scale(scale).translate([
-    ATLAS_WIDTH / 2 - scale * (xMin + xMax) / 2,
-    ATLAS_HEIGHT / 2 - scale * (yMin + yMax) / 2,
-  ]).clipExtent([[0, 0], [ATLAS_WIDTH, ATLAS_HEIGHT]]);
+    width / 2 - scale * (xMin + xMax) / 2,
+    height / 2 - scale * (yMin + yMax) / 2,
+  ]).clipExtent([[0, 0], [width, height]]);
   const points = coordinates.map((point) => projection(point) ?? [0, 0]);
   const path = (fraction: number) => {
     const count = Math.max(2, Math.ceil(Math.min(1, Math.max(0, fraction)) * (points.length - 1)) + 1);

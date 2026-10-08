@@ -32,6 +32,8 @@ describe("Geographic travel", () => {
       expect(route.coordinates[0][0]).toBeCloseTo(coords.longitude, 4);
       expect(route.coordinates[0][1]).toBeCloseTo(coords.latitude, 4);
       expect(route.planeAt(0).x).toBeCloseTo(route.origin[0]);
+      expect(route.planeAt(1).x).toBeCloseTo(route.destination[0]);
+      expect(route.planeAt(1).y).toBeCloseTo(route.destination[1]);
       expect(route.planeAt(0.5).heading).toBeTypeOf("number");
     });
   }
