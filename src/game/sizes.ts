@@ -36,7 +36,7 @@ import dress from "@/assets/items/dress.png";
 import accessory from "@/assets/items/accessory.png";
 import camerabag from "@/assets/items/camerabag.png";
 
-export interface PackedSize { shape: Shape; art?: string }
+export interface PackedSize { shape: Shape; alternatives?: Shape[]; art?: string }
 const rect = (w: number, h: number): Shape => Array.from({ length: h }, () => Array(w).fill(1));
 
 export const PACKED_SIZES: Record<string, PackedSize> = {
@@ -46,7 +46,7 @@ export const PACKED_SIZES: Record<string, PackedSize> = {
   tee: { shape: rect(2, 2) }, shirt: { shape: rect(2, 2), art: shirt }, aloha: { shape: rect(2, 2), art: aloha },
   linen: { shape: rect(2, 2) }, shorts: { shape: rect(2, 2), art: shorts }, trunks: { shape: rect(2, 2), art: trunks },
   swimsuit: { shape: rect(2, 2), art: swimsuit }, sandals: { shape: rect(2, 2), art: sandals }, sneakers: { shape: rect(2, 2), art: sneakers },
-  dressshoes: { shape: rect(2, 2), art: dressshoes }, camera: { shape: rect(2, 2), art: camera }, camerabag: { shape: rect(2, 2), art: camerabag },
+  dressshoes: { shape: rect(2, 2), alternatives: [[[0, 1, 1], [1, 1, 0]]], art: dressshoes }, camera: { shape: rect(2, 2), alternatives: [[[0, 1, 1], [1, 1, 1]]], art: camera }, camerabag: { shape: rect(2, 2), art: camerabag },
   toiletry: { shape: rect(2, 2), art: toiletry }, sweater: { shape: rect(2, 2), art: sweater }, adapterkit: { shape: rect(2, 2), art: adapterkit },
   jeans: { shape: rect(2, 3), art: jeans }, hikingpants: { shape: rect(2, 3), art: hikingpants }, jacket: { shape: rect(2, 3), art: jacket },
   dress: { shape: rect(2, 3), art: dress }, daybag: { shape: rect(2, 3), art: daybag },

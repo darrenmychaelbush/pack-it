@@ -14,8 +14,9 @@ interface Props {
 /** Renders an item as a single soft packing-cube object following its logical shape. */
 export function ItemBlocks(props: Props) {
   const lib = PACKED_SIZES[props.item.id];
-  const k = lib?.art ? [0, 1, 2, 3].find((n) => shapesEqual(rotateN(lib.shape, n), props.shape)) : undefined;
-  if (lib?.art && k !== undefined) return <ItemArt {...props} art={lib.art} native={lib.shape} turns={k} />;
+  const native = lib ? [lib.shape, ...(lib.alternatives ?? [])].find((candidate) => [0, 1, 2, 3].some((n) => shapesEqual(rotateN(candidate, n), props.shape))) : undefined;
+  const k = native ? [0, 1, 2, 3].find((n) => shapesEqual(rotateN(native, n), props.shape)) : undefined;
+  if (lib?.art && native && k !== undefined) return <ItemArt {...props} art={lib.art} native={native} turns={k} />;
   return <ItemCube {...props} />;
 }
 

@@ -41,9 +41,9 @@ describe("realistic packed sizes", () => {
       expect(level).toBeDefined();
       if (!level) return;
       for (const item of level.items) {
-        // London's interlocked dress-shoe pair uses its physically appropriate staggered silhouette.
-        if (level.id === "london" && item.itemId === "dressshoes") continue;
-        expect(footprintKey(item.shape), item.itemId).toBe(footprintKey(PACKED_SIZES[item.itemId].shape));
+        const packed = PACKED_SIZES[item.itemId];
+        const allowed = [packed.shape, ...(packed.alternatives ?? [])].map(footprintKey);
+        expect(allowed, item.itemId).toContain(footprintKey(item.shape));
       }
     });
   }
