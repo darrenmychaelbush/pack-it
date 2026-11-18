@@ -1,5 +1,7 @@
 # Pack It!
 
+[Play Pack It!](https://packit.dmbush.com/)
+
 Pack It! is a travel puzzle game for the browser. Players arrange differently shaped items inside a suitcase, complete destination-based levels, and collect passport stamps.
 
 Created as a personal project exploring game design, touch interaction, and development with generative AI.
@@ -32,7 +34,7 @@ The repository provides the generated source code for review alongside that deve
 
 ## Run locally
 
-Install Node.js and npm, then clone the repository using an account with access.
+Install Node.js and npm, then clone the repository.
 
 ```sh
 git clone https://github.com/darrenmychaelbush/pack-it.git
