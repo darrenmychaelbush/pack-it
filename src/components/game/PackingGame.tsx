@@ -1,6 +1,7 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Lightbulb, RotateCcw, RotateCw, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lightbulb, RotateCcw, RotateCw, X } from "lucide-react";
+import { useTrayScroll } from "@/hooks/use-tray-scroll";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ItemBlocks } from "./ItemBlocks";
@@ -294,6 +295,7 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
   };
 
   const trayItems = level.items.filter((i) => !items[i.instanceId].placement);
+  const tray = useTrayScroll(trayItems.map((i) => `${i.instanceId}:${items[i.instanceId].rotation}`).join("|"));
   const dragShape = dragId ? getItemShape(level, dragId, items[dragId].rotation) : null;
   const dragDef = dragId ? ITEMS[level.items.find((i) => i.instanceId === dragId)!.itemId] : null;
   const missing = level.missingInstanceId ? level.items.find((i) => i.instanceId === level.missingInstanceId) : undefined;
@@ -439,7 +441,9 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
 
       {/* Tray + controls */}
       <div ref={trayRef} className="px-3 pb-4 pt-3">
-        <div className="no-scrollbar flex min-h-[104px] gap-2 overflow-x-auto rounded-2xl border border-border bg-card p-2 shadow-soft">
+        <div className="flex items-stretch gap-1.5">
+        <TrayArrow dir={-1} disabled={tray.atStart} onClick={() => tray.step(-1)} />
+        <div ref={tray.ref} className="no-scrollbar flex min-h-[104px] min-w-0 flex-1 gap-2 overflow-x-auto rounded-2xl border border-border bg-card p-2 shadow-soft">
           {trayItems.length === 0 && (
             <div className="grid w-full place-items-center text-sm font-semibold text-muted-foreground">
               {phase === "playing" ? "Everything's in!" : "Zipping up…"}
@@ -469,6 +473,8 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
               </button>
             );
           })}
+        </div>
+        <TrayArrow dir={1} disabled={tray.atEnd} onClick={() => tray.step(1)} />
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Button variant="paper" className="h-12" onClick={restart} disabled={phase !== "playing"}>
@@ -677,5 +683,20 @@ function Results({
         </div>
       </div>
     </div>
+  );
+}
+
+function TrayArrow({ dir, disabled, onClick }: { dir: 1 | -1; disabled: boolean; onClick: () => void }) {
+  const Icon = dir < 0 ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir < 0 ? "Scroll items left" : "Scroll items right"}
+      className="grid w-11 shrink-0 place-items-center rounded-2xl border border-border bg-card text-foreground shadow-soft transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-35 disabled:shadow-none"
+    >
+      <Icon className="size-6" strokeWidth={2.5} />
+    </button>
   );
 }
