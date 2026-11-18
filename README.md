@@ -2,13 +2,13 @@
 
 Pack It! is a travel puzzle game for the browser. Players arrange differently shaped items inside a suitcase, complete destination-based levels, and collect passport stamps.
 
-Created by Darren Bush as a personal project exploring game design, touch interaction, and development with generative AI.
+Created as a personal project exploring game design, touch interaction, and development with generative AI.
 
 ## My role and development process
 
-I developed this project through prompting in Lovable, which generated the implementation. My work focused on the game concept, gameplay requirements, interface direction, play-testing, and directing revisions.
+I developed this project through prompting in Lovable, which generated the implementation. My work focused on the game concept, gameplay requirements, interface direction, play-testing, and directing revisions. This became a great learning tool to further my understanding in game development. 
 
-For example, while testing the Nashville and Miami puzzles, I identified issues with item sizing, boot alignment, scrolling, and touch usability. I used those observations to request changes and then checked the resulting gameplay.
+For example, while initially testing the first two puzzle levels, Nashville and Miami, I identified issues with item sizing, boot alignment, scrolling, and touch usability. I used those observations to request changes and then checked the resulting gameplay, and was also able to see how the code changed, helping speed up my learning curve. 
 
 The repository provides the generated source code for review alongside that development process.
 
@@ -76,4 +76,4 @@ Pack It! is a personal game prototype. Progress is stored locally in the browser
 ## Creator
 
 Darren Bush  
-[Portfolio](https://dmbush.com/) · [LinkedIn](https://www.linkedin.com/in/darren-m-bush)
+[Portfolio](https://dmbush.com/) 
