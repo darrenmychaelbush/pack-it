@@ -20,33 +20,40 @@ export function ItemBlocks(props: Props) {
   return <ItemCube {...props} />;
 }
 
-/** The illustrated object itself is the piece: artwork fills its footprint, rotated with it. */
-function ItemArt({ shape, cell, item, selected, className, art, native, turns }: Props & { art: string; native: Shape; turns: number }) {
+/** Box for artwork drawn in its native orientation, rotated by CSS about the footprint centre. */
+export function artLayout(shape: Shape, native: Shape, turns: number, cell: number) {
   const W = shape[0].length * cell;
   const H = shape.length * cell;
   const inset = Math.max(1.5, cell * 0.04);
-  const nw = native[0].length * cell - inset * 2;
-  const nh = native.length * cell - inset * 2;
+  const width = native[0].length * cell - inset * 2;
+  const height = native.length * cell - inset * 2;
+  return { W, H, left: W / 2 - width / 2, top: H / 2 - height / 2, width, height, rotate: turns * 90 };
+}
+
+/** The illustrated object itself is the piece: artwork fills its footprint, rotated with it. */
+function ItemArt({ shape, cell, item, selected, className, art, native, turns }: Props & { art: string; native: Shape; turns: number }) {
+  const b = artLayout(shape, native, turns, cell);
   return (
-    <div className={className} style={{ position: "relative", width: W, height: H }}>
-      {selected && (
-        <div style={{ position: "absolute", inset: 0, borderRadius: cell * 0.2, background: "color-mix(in oklab, var(--gold) 22%, transparent)", outline: "2px solid var(--gold)" }} />
-      )}
+    <div className={className} style={{ position: "relative", width: b.W, height: b.H }}>
+      {selected &&
+        shape.flatMap((row, i) => row.map((v, j) => v ? (
+          <div key={`${i}-${j}`} style={{ position: "absolute", top: i * cell, left: j * cell, width: cell, height: cell, background: "color-mix(in oklab, var(--gold) 22%, transparent)", outline: "2px solid var(--gold)", outlineOffset: -1 }} />
+        ) : null))}
       <img
         src={art}
         alt={item.name}
         draggable={false}
-        loading="lazy"
-        width={Math.max(1, Math.round(native[0].length * 512))}
-        height={Math.max(1, Math.round(native.length * 512))}
         style={{
           position: "absolute",
-          left: W / 2 - nw / 2,
-          top: H / 2 - nh / 2,
-          width: nw,
-          height: nh,
-          objectFit: "fill",
-          transform: `rotate(${turns * 90}deg)`,
+          left: b.left,
+          top: b.top,
+          width: b.width,
+          height: b.height,
+          // Preflight's img max-width:100% would clamp the pre-rotation box when it is wider than the rotated footprint.
+          maxWidth: "none",
+          maxHeight: "none",
+          objectFit: "contain",
+          transform: `rotate(${b.rotate}deg)`,
           pointerEvents: "none",
           filter: "drop-shadow(0 2px 2px oklch(0 0 0 / 0.35))",
         }}
