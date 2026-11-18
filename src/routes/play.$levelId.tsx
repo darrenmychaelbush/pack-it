@@ -20,7 +20,12 @@ export const Route = createFileRoute("/play/$levelId")({
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:type", content: "website" },
-        { name: "twitter:card", content: "summary" },
+        { property: "og:image", content: "https://packit.dmbush.com/og-image.png" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: "Pack It! logo" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: "https://packit.dmbush.com/og-image.png" },
       ],
     };
   },
