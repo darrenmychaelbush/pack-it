@@ -34,6 +34,17 @@ interface Ghost {
   valid: boolean;
 }
 
+interface DragInfo {
+  id: string;
+  pointerId: number;
+  x: number;
+  y: number;
+  offX: number;
+  offY: number;
+  shape: Shape;
+  rotation: Rotation;
+}
+
 function useCellSize(level: LevelDefinition) {
   const [cell, setCell] = useState(40);
   useEffect(() => {
@@ -68,6 +79,9 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
   const [hintUsed, setHintUsed] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dragRotation, setDragRotation] = useState<Rotation | null>(null);
+  // Packed items keep their old footprint until their rotated preview is dropped legally.
+  const [pendingRotation, setPendingRotation] = useState<{ id: string; rotation: Rotation } | null>(null);
   const [ghost, setGhost] = useState<Ghost | null>(null);
   const [hint, setHint] = useState<ReturnType<typeof getHintPlacement>>(null);
   const [shakeId, setShakeId] = useState<string | null>(null);
@@ -126,7 +140,8 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
     navigate({ to: "/" });
   };
 
-  const dragInfo = useRef<{ x: number; y: number; offX: number; offY: number; shape: Shape } | null>(null);
+  const dragInfo = useRef<DragInfo | null>(null);
+  const ghostRef = useRef<Ghost | null>(null);
 
   const packedCount = level.items.filter((i) => items[i.instanceId].placement).length;
   const prevBest = progress.levels[level.id];
@@ -170,111 +185,177 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
 
   const positionFloat = () => {
     const d = dragInfo.current;
-    if (floatRef.current && d) floatRef.current.style.transform = `translate3d(${d.x - d.offX}px, ${d.y - d.offY}px, 0)`;
+    if (floatRef.current && d) {
+      floatRef.current.style.transform = "translate3d(" + (d.x - d.offX) + "px, " + (d.y - d.offY) + "px, 0)";
+    }
   };
-  useLayoutEffect(positionFloat, [dragId]);
+  useLayoutEffect(positionFloat, [dragId, dragRotation]);
+
+  const getDropGhost = (id: string, d: DragInfo): Ghost | null => {
+    const b = boardRef.current?.getBoundingClientRect();
+    if (!b) return null;
+    const left = d.x - d.offX - b.left;
+    const top = d.y - d.offY - b.top;
+    const w = d.shape[0].length * cell;
+    const h = d.shape.length * cell;
+    const cx = left + w / 2;
+    const cy = top + h / 2;
+    if (cx <= -cell || cx >= b.width + cell || cy <= -cell || cy >= b.height + cell) return null;
+    const row = Math.round(top / cell);
+    const col = Math.round(left / cell);
+    return { row, col, valid: canPlaceItem(level, itemsRef.current, id, d.shape, row, col) };
+  };
+
+  const refreshGhost = (id: string, d: DragInfo) => {
+    const next = getDropGhost(id, d);
+    const previous = ghostRef.current;
+    ghostRef.current = next;
+    if (previous?.row !== next?.row || previous?.col !== next?.col || previous?.valid !== next?.valid) setGhost(next);
+  };
+
+  // Rotate the floating piece, not its former occupied cells.
+  // During a drag, use Rotate with a second finger or tap the suitcase with a second finger.
+  const rotateInFlight = (id: string, d: DragInfo) => {
+    const w = d.shape[0].length * cell;
+    const h = d.shape.length * cell;
+    d.rotation = ((d.rotation + 1) % 4) as Rotation;
+    d.shape = getItemShape(level, id, d.rotation);
+    d.offX += (d.shape[0].length * cell - w) / 2;
+    d.offY += (d.shape.length * cell - h) / 2;
+    setDragRotation(d.rotation);
+    refreshGhost(id, d);
+    positionFloat();
+    feedback("rotate");
+  };
 
   const onPointerDown = (e: React.PointerEvent<HTMLElement>, id: string, source: "tray" | "board") => {
-    if (phase !== "playing" || e.button > 0) return;
+    if (phase !== "playing" || e.button > 0 || dragInfo.current) return;
     e.preventDefault();
     const st = itemsRef.current[id];
-    const shape = getItemShape(level, id, st.rotation);
+    const rotation = pendingRotation?.id === id ? pendingRotation.rotation : st.rotation;
+    const shape = getItemShape(level, id, rotation);
     const rect = e.currentTarget.getBoundingClientRect();
     const w = shape[0].length * cell;
     const h = shape.length * cell;
-    const offX = source === "board" ? e.clientX - rect.left : w / 2;
-    const offY = source === "board" ? e.clientY - rect.top : h / 2 + Math.min(44, cell);
+    const awaitingRotation = source === "board" && rotation !== st.rotation;
+    const offX = source === "board" && !awaitingRotation ? e.clientX - rect.left : w / 2;
+    const offY = source === "board" && !awaitingRotation ? e.clientY - rect.top : h / 2 + (source === "tray" ? Math.min(44, cell) : 0);
     const sx = e.clientX;
     const sy = e.clientY;
     let moved = false;
-    let g: Ghost | null = null;
-    dragInfo.current = { x: sx, y: sy, offX, offY, shape };
+    const d: DragInfo = { id, pointerId: e.pointerId, x: sx, y: sy, offX, offY, shape, rotation };
+    dragInfo.current = d;
+    ghostRef.current = null;
 
     const move = (ev: PointerEvent) => {
-      const d = dragInfo.current!;
+      if (ev.pointerId !== d.pointerId) return;
       d.x = ev.clientX;
       d.y = ev.clientY;
       if (!moved) {
         if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return;
         moved = true;
         setDragId(id);
+        setDragRotation(d.rotation);
         setSelected(id);
+        if (pendingRotation?.id !== id) setPendingRotation(null);
         feedback("pickup");
       }
       positionFloat();
-      const b = boardRef.current!.getBoundingClientRect();
-      const left = ev.clientX - offX - b.left;
-      const top = ev.clientY - offY - b.top;
-      const cx = left + w / 2;
-      const cy = top + h / 2;
-      const near = cx > -cell && cx < b.width + cell && cy > -cell && cy < b.height + cell;
-      let next: Ghost | null = null;
-      if (near) {
-        const row = Math.round(top / cell);
-        const col = Math.round(left / cell);
-        next = { row, col, valid: canPlaceItem(level, itemsRef.current, id, shape, row, col) };
-      }
-      if (next?.row !== g?.row || next?.col !== g?.col || next?.valid !== g?.valid) {
-        g = next;
-        setGhost(next);
-      }
+      refreshGhost(id, d);
     };
-    const up = (ev: PointerEvent) => {
+
+    const secondaryDown = (ev: PointerEvent) => {
+      if (!moved || ev.pointerId === d.pointerId || ev.pointerType !== "touch") return;
+      if (!boardRef.current?.contains(ev.target as Node)) return;
+      ev.preventDefault();
+      rotateInFlight(id, d);
+    };
+
+    const cleanup = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("pointerdown", secondaryDown);
+    };
+
+    const cancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== d.pointerId) return;
+      cleanup();
+      dragInfo.current = null;
+      ghostRef.current = null;
+      setDragId(null);
+      setDragRotation(null);
+      setGhost(null);
+    };
+
+    const up = (ev: PointerEvent) => {
+      // Releasing a second finger must not accidentally drop the piece.
+      if (ev.pointerId !== d.pointerId) return;
+      cleanup();
       if (!moved) {
-        setSelected((s) => (s === id ? null : id));
+        if (selected === id) {
+          setSelected(null);
+          setPendingRotation(null);
+        } else {
+          setSelected(id);
+          setPendingRotation(null);
+        }
         dragInfo.current = null;
+        ghostRef.current = null;
         return;
       }
-      setDragId(null);
-      setGhost(null);
+      const finalGhost = ghostRef.current;
       dragInfo.current = null;
+      ghostRef.current = null;
+      setDragId(null);
+      setDragRotation(null);
+      setGhost(null);
       const cur = itemsRef.current[id];
-      if (g && g.valid) {
-        if (!cur.placement || cur.placement.row !== g.row || cur.placement.col !== g.col) {
-          commit(placeItem(itemsRef.current, id, { row: g.row, col: g.col }), id);
+      if (finalGhost?.valid) {
+        if (!cur.placement || cur.placement.row !== finalGhost.row || cur.placement.col !== finalGhost.col || cur.rotation !== d.rotation) {
+          commit(placeItem(itemsRef.current, id, { row: finalGhost.row, col: finalGhost.col }, d.rotation), id);
+          setPendingRotation(null);
         }
         return;
       }
       const t = trayRef.current?.getBoundingClientRect();
       if (source === "board" && t && ev.clientY >= t.top) {
-        // Forgot It! is rearrangement-only: anything that began packed stays inside.
+        // Forgot It! is rearrangement-only: packed items stay in the suitcase.
         if (level.type === "forgot" && id !== level.missingInstanceId) {
           shake(id);
           toast("Keep packed items in the suitcase", { duration: 1200 });
           return;
         }
         setItems(removeItem(itemsRef.current, id));
+        setPendingRotation(null);
         return;
       }
       shake(id);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("pointerdown", secondaryDown);
   };
 
   const rotateSelected = () => {
     if (!selected || phase !== "playing") return;
-    const st = items[selected];
-    const nr = ((st.rotation + 1) % 4) as Rotation;
-    const shape = getItemShape(level, selected, nr);
-    if (!st.placement) {
-      setItems({ ...items, [selected]: { ...st, rotation: nr } });
-      feedback("rotate");
+    const d = dragInfo.current;
+    if (dragId === selected && d?.id === selected) {
+      rotateInFlight(selected, d);
       return;
     }
-    for (const [dr, dc] of NUDGES) {
-      const row = st.placement.row + dr;
-      const col = st.placement.col + dc;
-      if (canPlaceItem(level, items, selected, shape, row, col)) {
-        commit(placeItem(items, selected, { row, col }, nr), selected);
-        return;
-      }
+    const st = items[selected];
+    const currentRotation = pendingRotation?.id === selected ? pendingRotation.rotation : st.rotation;
+    const nextRotation = ((currentRotation + 1) % 4) as Rotation;
+    if (!st.placement) {
+      setItems({ ...items, [selected]: { ...st, rotation: nextRotation } });
+      setPendingRotation(null);
+    } else {
+      // Queue the orientation until legal placement; preview rotation never costs a move.
+      setPendingRotation(nextRotation === st.rotation ? null : { id: selected, rotation: nextRotation });
     }
-    shake(selected);
+    feedback("rotate");
   };
 
   const showHint = () => {
@@ -290,21 +371,29 @@ export function PackingGame({ level }: { level: LevelDefinition }) {
     setMoves(0);
     setHintUsed(false);
     setSelected(null);
+    setPendingRotation(null);
+    setDragId(null);
+    setDragRotation(null);
+    setGhost(null);
+    dragInfo.current = null;
+    ghostRef.current = null;
     setResult(null);
     setPhase("playing");
   };
 
   const trayItems = level.items.filter((i) => !items[i.instanceId].placement);
   const tray = useTrayScroll(trayItems.map((i) => `${i.instanceId}:${items[i.instanceId].rotation}`).join("|"));
-  const dragShape = dragId ? getItemShape(level, dragId, items[dragId].rotation) : null;
+  const dragShape = dragId ? getItemShape(level, dragId, dragRotation ?? items[dragId].rotation) : null;
   const dragDef = dragId ? ITEMS[level.items.find((i) => i.instanceId === dragId)!.itemId] : null;
   const missing = level.missingInstanceId ? level.items.find((i) => i.instanceId === level.missingInstanceId) : undefined;
   const coach =
-    phase === "playing" && moves === 0
+    phase === "playing" && pendingRotation?.id === selected
+      ? "↻ Rotation ready · drag to place"
+      : phase === "playing" && moves === 0
       ? level.levelNumber === 1
         ? "Drag an item into the suitcase"
         : level.levelNumber === 6
-          ? "Tap an item, then Rotate ↻"
+          ? "Tap item · Rotate · drag to place"
           : level.type === "forgot"
             ? "Move packed items to make room"
             : null
